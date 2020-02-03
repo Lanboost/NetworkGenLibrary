@@ -1,172 +1,189 @@
-interface NetClass {
-    public List<Socket> GetSyncSockets();
-    public void WriteHeader(BinaryWriter writer, object var);
-}
+using System.Collections.Generic;
+using System.IO;
+using System;
 
-class NetObject {
-    public uint netId;
-}
-
-class Socket
-{
-	public uint pid;
-	public BinaryWriter tickStream = new BinaryWriter();
-
-}
-
-class Main
-{
-	public static List<Socket> players;
-
-}
-
-class PlayerBuilder {
-	public Player build()
-	{
-		var p = new Player();
-		p.SetSocket(v);
+namespace NetServer {
+	public interface NetClass {
+		List<Socket> GetSyncSockets();
+		void WriteHeader(BinaryWriter writer, object var);
+		void Write(Socket s, BinaryWriter writer);
 	}
 
+	public class NetObject {
+		public uint netId;
+	}
+
+	public class Socket
+	{
+		public uint pid;
+		public BinaryWriter tickStream = new BinaryWriter(new MemoryStream());
+
+	}
+
+	public class Main
+	{
+		public static List<Socket> players = new List<Socket>();
+
+	}
+
+	public class PlayerBuilder {
+		public Player build()
+		{
+			var p = new Player();
+			p.SetSocket(null);
+			return p;
+		}
+
+	}
+
+
+	{{#objects}}
+	{{#netobject}}
+	public class {{name}} : NetObject, NetClass  {
+	{{/netobject}}
+	{{^netobject}}
+	public class {{name}} : NetClass  {
+	{{/netobject}}
+
+		{{^netobject}}
+		NetClass parent;
+		{{/netobject}}
+
+		{{#vars}}
+		{{type}} {{name}};
+		{{/vars}}
+		
+		{{#vars}}
+		public {{type}} Get{{name}}() {
+			return this.{{name}};
+		}
+		{{#server_only}}
+		public void Set{{name}}({{type}} value) {
+			this.{{name}} = value;
+		}
+		{{/server_only}}
+		{{^server_only}}
+		public void Set{{name}}({{type}} value) {
+			this.PreUpdate();
+			this.{{name}} = value;
+			this.PostUpdate();
+			this.Sync(delegate(Socket s, BinaryWriter writer) {
+				
+				{{#netobject}}
+				writer.Write({{netType}});
+				writer.Write(netId);
+				{{/netobject}}
+				{{^netobject}}
+				this.parent.WriteHeader(writer, this);
+				{{/netobject}}
+				
+				
+				writer.Write((byte){{index}});
+				{{#primitive}}
+				writer.Write(value);
+				{{/primitive}}
+				{{^primitive}}
+				if(this.{{name}} == null) {
+					writer.Write((byte)0);
+				}
+				else {
+					writer.Write((byte)1);
+					this.{{name}}.Write(s, writer);
+				}
+				{{/primitive}}
+			}, this);
+		}
+		{{/server_only}}
+		{{/vars}}
+		
+		public void Write(Socket s, BinaryWriter writer) {
+			{{#netobject}}
+			writer.Write({{netType}});
+			writer.Write(UInt32.MaxValue);
+			writer.Write(netId);
+			{{/netobject}}
+		
+			{{#vars}}
+			{{^server_only}}
+			
+			{{#primitive}}
+			writer.Write(this.{{name}});
+			{{/primitive}}
+			{{^primitive}}
+			if(this.{{name}} == null) {
+				writer.Write((byte)0);
+			}
+			else {
+				if(this.{{name}}.SyncFilter(s)) {
+					writer.Write((byte)1);
+					this.{{name}}.Write(s, writer);
+				}
+				else {
+					writer.Write((byte)0);
+				}
+			}
+			{{/primitive}}
+			{{/server_only}}
+			{{/vars}}
+		}
+		
+		{{#funcs}}
+		{{#PreUpdate}}
+		public void PreUpdate() { {{{ . }}} }
+		{{/PreUpdate}}
+		{{^PreUpdate}}
+		public void PreUpdate() {}
+		{{/PreUpdate}}
+		
+		{{#PostUpdate}}
+		public void PostUpdate() { {{{ . }}} }
+		{{/PostUpdate}}
+		{{^PostUpdate}}
+		public void PostUpdate() {}
+		{{/PostUpdate}}
+		
+		{{#SyncFilter}}
+		public bool SyncFilter(Socket socket) { {{{ . }}} }
+		{{/SyncFilter}}
+		{{^SyncFilter}}
+		public bool SyncFilter(Socket socket) { return true;}
+		{{/SyncFilter}}
+		
+		{{#GetSyncSockets}}
+		public List<Socket> GetSyncSockets() { {{{ . }}} }
+		{{/GetSyncSockets}}
+		{{^GetSyncSockets}}
+		public List<Socket> GetSyncSockets() {return this.parent.GetSyncSockets();}
+		{{/GetSyncSockets}}
+		
+		{{/funcs}}
+		
+		public void WriteHeader(BinaryWriter writer, object var) {
+			{{#netobject}}
+			writer.Write({{netType}});
+			writer.Write(netId);
+			{{/netobject}}
+			{{^netobject}}
+			this.parent.WriteHeader(writer, this);
+			{{/netobject}}
+		
+			{{#vars}}
+			{{^primitive}}
+			if(this.{{name}} == var) {
+				writer.Write({{index}});
+			}
+			{{/primitive}}
+			{{/vars}}
+		}
+		
+		public void Sync(Action<Socket, BinaryWriter> del, NetClass obj) {
+			var sockets = obj.GetSyncSockets();
+			foreach(var sock in sockets) {
+				del(sock, sock.tickStream);
+			}
+		}
+		
+	}
+
+	{{/objects}}
 }
-
-
-{{#objects}}
-{{#netobject}}
-class {{name}} : NetObject, NetClass  {
-{{/netobject}}
-{{^netobject}}
-class {{name}} : NetClass  {
-{{/netobject}}
-
-    {{^netobject}}
-    NetClass parent;
-    {{/netobject}}
-
-    {{#vars}}
-    {{type}} {{name}};
-    {{/vars}}
-    
-    {{#vars}}
-    public {{type}} Get{{name}}() {
-        return this.{{name}};
-    }
-    
-    public void Set{{name}}({{type}} value) {
-        this.PreUpdate();
-        this.{{name}} = value;
-        this.PostUpdate();
-        this.Sync(delegate(BinaryWriter w) {
-            
-            {{#netobject}}
-            writer.Write({{netType}});
-            writer.Write(netId);
-            {{/netobject}}
-            {{^netobject}}
-            this.parent.WriteHeader(w, this);
-            {{/netobject}}
-            
-            
-            w.write((byte){{index}});
-            {{#primitive}}
-            w.write((byte)value);
-            {{/primitive}}
-            {{^primitive}}
-            if(this.{{name}} == null) {
-                w.write((byte)0);
-            }
-            else {
-                w.write((byte)1);
-                this.{{name}}.write(w);
-            }
-            {{/primitive}}
-        }, this);
-    }
-    {{/vars}}
-    
-    public void write(Socket s, BinaryWriter w) {
-        {{#netobject}}
-        writer.Write({{netType}});
-        writer.Write(UInt32.MaxValue);
-        writer.Write(netId);
-        {{/netobject}}
-    
-        {{#vars}}
-        {{#primitive}}
-        w.Write(this.{{name}});
-        {{/primitive}}
-        {{^primitive}}
-        if(this.{{name}} == null) {
-            w.write((byte)0);
-        }
-        else {
-            if(w.SyncFilter(s)) {
-                w.write((byte)1);
-                this.{{name}}.write(w);
-            }
-            else {
-                w.write((byte)0);
-            }
-        }
-        {{/primitive}}
-        {{/vars}}
-    }
-    
-    {{#funcs}}
-    {{#PreUpdate}}
-    void PreUpdate() { {{{ . }}} }
-    {{/PreUpdate}}
-    {{^PreUpdate}}
-    void PreUpdate() {}
-    {{/PreUpdate}}
-    
-    {{#PostUpdate}}
-    void PostUpdate() { {{{ . }}} }
-    {{/PostUpdate}}
-    {{^PostUpdate}}
-    void PostUpdate() {}
-    {{/PostUpdate}}
-    
-    {{#SyncFilter}}
-    bool SyncFilter(Socket socket) { {{{ . }}} }
-    {{/SyncFilter}}
-    {{^SyncFilter}}
-    bool SyncFilter(Socket socket) { return true;}
-    {{/SyncFilter}}
-    
-    {{#GetSyncSockets}}
-    List<Socket> GetSyncSockets() { {{{ . }}} }
-    {{/GetSyncSockets}}
-    {{^GetSyncSockets}}
-    List<Socket> GetSyncSockets() {return this.parent.GetSyncSockets();}
-    {{/GetSyncSockets}}
-    
-    {{/funcs}}
-    
-    public void WriteHeader(BinaryWriter writer, object var) {
-        {{#netobject}}
-        writer.Write({{netType}});
-        writer.Write(netId);
-        {{/netobject}}
-        {{^netobject}}
-        this.parent.WriteHeader(writer, this);
-        {{/netobject}}
-    
-        {{#vars}}
-        {{^primitive}}
-        if(this.{{name}} == var) {
-            writer.write({{index}});
-        }
-        {{/primitive}}
-        {{/vars}}
-    }
-    
-    public void Sync(Action<BinaryWriter> del, NetClass obj) {
-        var sockets = obj.GetSyncSockets();
-        foreach(var sock in sockets) {
-            del(sock.tickStream);
-        }
-    }
-    
-}
-
-{{/objects}}

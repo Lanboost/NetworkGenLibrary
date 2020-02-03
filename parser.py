@@ -325,9 +325,9 @@ def read_file(filename):
 
 def primative_to_binary_reader(type):
     d = {
-        'int':'Int32',
-        'string':'String',
-        'float':'Float',
+        'int':'reader.ReadInt32',
+        'string':'reader.ReadString',
+        'float':'reader.ReadSingle',
     }
     if type in d:
         return d[type]
@@ -342,7 +342,16 @@ def render(objects):
     for o in objects:
         vars = []
         for index,v in enumerate(o[2]):
-            vars += [{'name':v[2],'type':v[0], 'index':index, 'primitive':is_primative(v[0]), 'readtype': primative_to_binary_reader(v[0])}]
+        
+            vars += [
+                {'name':v[2],
+                'type':v[0], 
+                'index':index, 
+                'primitive':is_primative(v[0]), 
+                'readtype': primative_to_binary_reader(v[0]),
+                'server_only': True if v[3] == 'server' else False,
+                'client_only': True if v[3] == 'client' else False,
+                }]
         funcs = {"something":""} #init with something so it isn't false
         
         for f in o[3]:
@@ -364,9 +373,9 @@ def render(objects):
 p = Parser(read_file('network_code.txt'))
 o = p.objects()
 data_write, data_read = render(o)
-with open("parser_out_write.cs","w") as f:
+with open("output/NetworkTest/parser_out_write.cs","w") as f:
     f.write(data_write)
-with open("parser_out_read.cs","w") as f:
+with open("output/NetworkTest/parser_out_read.cs","w") as f:
     f.write(data_read)
         
         

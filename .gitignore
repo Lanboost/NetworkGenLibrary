@@ -1,2 +1,6 @@
-parser_out_read.cs
-parser_out_write.cs
+output/NetworkTest/parser_out_read.cs
+output/NetworkTest/parser_out_write.cs
+*.vs
+*packages
+*bin
+*obj

@@ -9,12 +9,13 @@ Player,NetObject {
     Inventory Inventory;
     
     this.GetSyncSockets = #{
-        List<Socket> s = new List();
+        List<Socket> s = new List<Socket>();
         foreach(var p in Main.players) {
-            var d = dist(Main.players[this.Socket.pid], Main.players[p]);
-            if(d < 30) {
-                s.Add(p.socket);
-            }
+            //var d = dist(Main.players[((int)this.Socket.pid)], Main.players[p]);
+            //if(d < 30) {
+            //    s.Add(p.Socket);
+            //}
+			s.Add(p);
         }
         return s;
     }
@@ -30,9 +31,9 @@ Position {
     float LastZ,Server;
     
     this.PreUpdate = #{
-        this.LastX = this.x;
-        this.LastY = this.y;
-        this.LastZ = this.z;
+        this.LastX = this.X;
+        this.LastY = this.Y;
+        this.LastZ = this.Z;
     }
     
     this.PostUpdate = #{
@@ -47,13 +48,13 @@ Inventory {
     int Coins;
     
     this.GetSyncSockets = #{
-        List<Socket> s = new List();
-        s.Add(this.parent.socket);
+        List<Socket> s = new List<Socket>();
+        s.Add(((Player)this.parent).GetSocket());
         return s;
     }
     
     this.SyncFilter = #{
-        return socket.pid == this.parent.socket.pid;
+        return socket.pid == ((Player)this.parent).GetSocket().pid;
     }
 }
 

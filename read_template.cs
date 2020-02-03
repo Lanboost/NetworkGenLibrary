@@ -1,103 +1,128 @@
-interface NetClass {
-	public void WriteHeader(BinaryWriter writer, object var);
-}
+using System.Collections.Generic;
+using System.IO;
+using System;
 
-class NetObject {
-	public uint netId;
-}
-
-class NetReader {
-	Dictionary<uint, object> netObjects = new Dictionary<uint, object>();
-		
-	public static void ReadTick(BinaryReader reader) {
-		uint netType = reader.ReadUInt32();
-		uint netId = reader.ReadUInt32();
-		bool fullObject = netId == UInt32.MaxValue;
-		
-		{{#objects}}
-		{{#netobject}}
-		if(netType == {{netType}}) {
-			if(fullObject) {			
-				var obj = {{name}}.ReadObject();
-				netObjects.Add(obj.netId, obj);
-			}
-			else {
-				(({{name}}) netObjects[netId]).Read(reader);
-			}
-		}
-		{{/netobject}}
-		{{/objects}}
-	
+namespace NetClient {
+	public interface NetClass {
+		void ReadObject(BinaryReader reader);
+		void Read(BinaryReader reader);
 	}
-}
 
-
-
-{{#objects}}
-{{#netobject}}
-class {{name}} : NetObject, NetClass  {
-{{/netobject}}
-{{^netobject}}
-class {{name}} : NetClass  {
-{{/netobject}}
-
-
-	{{#vars}}
-	{{type}} {{name}};
-	{{/vars}}
-	
-	{{#vars}}
-	public {{type}} Get{{name}}() {
-		return this.{{name}};
+	public class NetObject {
+		public uint netId;
 	}
-	{{/vars}}
-	
-	public void ReadObject(BinaryWriter reader) {
-		{{#vars}}
-		{{#primitive}}
-		this.{{name}} = reader.Read{{readtype}}();
-		{{/primitive}}
-		{{^primitive}}
-		var isnull = reader.ReadByte();
-		if(isnull) {
-			this.{{name}} = null;
-		}
-		else {
-			if(this.{{name}} == null) {
-				this.{{name}} = new {{type}}();
-			}
-			this.{{name}}.ReadObject(reader);
-		}
-		{{/primitive}}
-		{{/vars}}
-	}
-	
-	public void Read(BinaryWriter reader) {
-		var index = reader.ReadByte();
-	
-		{{#vars}}
-		if(index == {{index}}) {
-			{{#primitive}}
-			this.{{name}} = reader.Read{{readtype}}();
-			{{/primitive}}
-			{{^primitive}}
-			var isnull = reader.ReadByte();
-			if(isnull) {
-				this.{{name}} = null;
-			}
-			else {
-				if(this.{{name}} == null) {
-					this.{{name}} = new {{type}}();
+
+	public class NetReader {
+		public Dictionary<uint, object> netObjects = new Dictionary<uint, object>();
+			
+		public void ReadTick(BinaryReader reader) {
+			uint netType = reader.ReadUInt32();
+			uint netId = reader.ReadUInt32();
+			bool fullObject = netId == UInt32.MaxValue;
+			
+			{{#objects}}
+			{{#netobject}}
+			if(netType == {{netType}}) {
+				if(fullObject) {	
+					var obj = new {{name}}();
+					obj.ReadObject(reader);
+					netObjects.Add(obj.netId, obj);
 				}
-				this.{{name}}.Read(reader);
+				else {
+					(({{name}}) netObjects[netId]).Read(reader);
+				}
 			}
-			{{/primitive}}
+			{{/netobject}}
+			{{/objects}}
+		
 		}
-		{{/vars}}
-	
+		
+		public T Get<T>(uint id) {
+			if(netObjects[id].GetType() == typeof(T)) {
+				return (T) netObjects[id];
+			}
+			return default(T);
+		}
 	}
-	
-	
-}
 
-{{/objects}}
+
+
+	{{#objects}}
+	{{#netobject}}
+	public class {{name}} : NetObject, NetClass  {
+	{{/netobject}}
+	{{^netobject}}
+	public class {{name}} : NetClass  {
+	{{/netobject}}
+
+
+		{{#vars}}
+		{{^server_only}}
+		{{type}} {{name}};
+		{{/server_only}}
+		{{/vars}}
+		
+		{{#vars}}
+		{{^server_only}}
+		public {{type}} Get{{name}}() {
+			return this.{{name}};
+		}
+		{{/server_only}}
+		{{/vars}}
+		
+		public void ReadObject(BinaryReader reader) {
+			{{#vars}}
+			{{^server_only}}
+			{
+				{{#primitive}}
+				this.{{name}} = {{readtype}}();
+				{{/primitive}}
+				{{^primitive}}
+				var isnull = reader.ReadByte() == 0;
+				if(isnull) {
+					this.{{name}} = null;
+				}
+				else {
+					if(this.{{name}} == null) {
+						this.{{name}} = new {{type}}();
+					}
+					this.{{name}}.ReadObject(reader);
+				}
+				{{/primitive}}
+			}
+			{{/server_only}}
+			{{/vars}}
+		}
+		
+		public void Read(BinaryReader reader) {
+			var index = reader.ReadByte();
+		
+			{{#vars}}
+			{{^server_only}}
+			if(index == {{index}}) {
+				{{#primitive}}
+				this.{{name}} = {{readtype}}();
+				{{/primitive}}
+				{{^primitive}}
+				var isnull = reader.ReadByte() == 0;
+				if(isnull) {
+					this.{{name}} = null;
+				}
+				else {
+					if(this.{{name}} == null) {
+						this.{{name}} = new {{type}}();
+					}
+					this.{{name}}.Read(reader);
+				}
+				{{/primitive}}
+			}
+			{{/server_only}}
+			{{/vars}}
+		
+		}
+		
+		
+	}
+
+	{{/objects}}
+}
