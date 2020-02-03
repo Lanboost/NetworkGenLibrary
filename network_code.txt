@@ -1,0 +1,64 @@
+Player,NetObject {
+    #Socket Socket,Server;
+    String Name;
+    Position Position;
+    Int Health;
+    Int MaxHealth;
+    Int Mana;
+    Int MaxMana;
+    Inventory Inventory;
+    
+    this.GetSyncSockets = #{
+        List<Socket> s = new List();
+        foreach(var p in Main.players) {
+            var d = dist(Main.players[this.Socket.pid], Main.players[p]);
+            if(d < 30) {
+                s.Add(p.socket);
+            }
+        }
+        return s;
+    }
+}
+
+Position {
+    float X;
+    float Y;
+    float Z;
+    
+    float LastX,Server;
+    float LastY,Server;
+    float LastZ,Server;
+    
+    this.PreUpdate = #{
+        this.LastX = this.x;
+        this.LastY = this.y;
+        this.LastZ = this.z;
+    }
+    
+    this.PostUpdate = #{
+        //check which sockets we need to send entire NetObject too
+        
+        //sync tiles !!!
+    }
+}
+
+Inventory {
+    Item[] Items;
+    int Coins;
+    
+    this.GetSyncSockets = #{
+        List<Socket> s = new List();
+        s.Add(this.parent.socket);
+        return s;
+    }
+    
+    this.SyncFilter = #{
+        return socket.pid == this.parent.socket.pid;
+    }
+}
+
+Item {
+    int Itemid;
+    int Subtype;
+    int Count;
+}
