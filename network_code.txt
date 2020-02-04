@@ -10,13 +10,23 @@ Player,NetObject {
     
     this.GetSyncSockets = #{
         List<Socket> s = new List<Socket>();
+		
+		
         foreach(var p in Main.players) {
-            //var d = dist(Main.players[((int)this.Socket.pid)], Main.players[p]);
-            //if(d < 30) {
-            //    s.Add(p.Socket);
-            //}
-			s.Add(p);
+			if(this.Socket.pid != p.Value.GetSocket().pid) {
+				var p1 = Main.players[this.Socket.pid].GetPosition();
+				var p2 = Main.players[p.Key].GetPosition();
+			
+				var d = Math.Abs(p1.GetX()-p2.GetX())+Math.Abs(p1.GetZ()-p2.GetZ());
+			
+				if(d < 30) {
+					s.Add(p.Value.GetSocket());
+				}
+			}
         }
+		
+		s.Add(this.Socket);
+		
         return s;
     }
 }
@@ -40,6 +50,22 @@ Position {
         //check which sockets we need to send entire NetObject too
         
         //sync tiles !!!
+		
+		foreach(var p in Main.players) {
+			if(((Player)this.parent).GetSocket().pid != p.Value.GetSocket().pid) {
+				var p1 = Main.players[((Player)this.parent).GetSocket().pid].GetPosition();
+				var p2 = Main.players[p.Key].GetPosition();
+			
+				var d1 = Math.Abs(p1.GetLastX()-p2.GetLastX())+Math.Abs(p1.GetLastZ()-p2.GetLastZ());
+				var d2 = Math.Abs(p1.GetX()-p2.GetX())+Math.Abs(p1.GetZ()-p2.GetZ());
+			
+				if(d1 > 30 && d2 < 30) {
+					//Sync entire object to socket
+					this.parent.Write(p.Value.GetSocket(), p.Value.GetSocket().tickStream);
+					p.Value.Write(((Player)this.parent).GetSocket(), ((Player)this.parent).GetSocket().tickStream);
+				}
+			}
+        }
     }
 }
 

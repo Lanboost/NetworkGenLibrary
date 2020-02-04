@@ -17,12 +17,15 @@ namespace NetServer {
 	{
 		public uint pid;
 		public BinaryWriter tickStream = new BinaryWriter(new MemoryStream());
+		
+		public NetClass parent;
 
 	}
 
 	public class Main
 	{
-		public static List<Socket> players = new List<Socket>();
+		public static List<Socket> sockets = new List<Socket>();
+		public static Dictionary<uint, Player> players = new Dictionary<uint, Player>();
 
 	}
 
@@ -46,11 +49,31 @@ namespace NetServer {
 	{{/netobject}}
 
 		{{^netobject}}
-		NetClass parent;
+		public NetClass parent;
 		{{/netobject}}
 
 		{{#vars}}
 		{{type}} {{name}};
+		{{/vars}}
+		
+		public {{name}}() {
+			
+		}
+		
+		public {{name}}({{#vars}}{{#first}}{{type}} {{name}}{{/first}}{{^first}}, {{type}} {{name}}{{/first}}{{/vars}}) {
+			{{#vars}}
+			this.{{name}} = {{name}};
+			{{/vars}}
+		}
+		
+		
+		{{#vars}}
+		public void Init{{name}}({{type}} value) {
+			this.{{name}} = value;
+			{{^primitive}}
+			this.{{name}}.parent = this;
+			{{/primitive}}
+		}
 		{{/vars}}
 		
 		{{#vars}}
@@ -66,6 +89,10 @@ namespace NetServer {
 		public void Set{{name}}({{type}} value) {
 			this.PreUpdate();
 			this.{{name}} = value;
+			{{^primitive}}
+			this.{{name}}.parent = this;
+			{{/primitive}}
+			
 			this.PostUpdate();
 			this.Sync(delegate(Socket s, BinaryWriter writer) {
 				
@@ -79,6 +106,7 @@ namespace NetServer {
 				
 				
 				writer.Write((byte){{index}});
+				
 				{{#primitive}}
 				writer.Write(value);
 				{{/primitive}}
@@ -87,7 +115,7 @@ namespace NetServer {
 					writer.Write((byte)0);
 				}
 				else {
-					writer.Write((byte)1);
+					writer.Write((byte)2);
 					this.{{name}}.Write(s, writer);
 				}
 				{{/primitive}}
@@ -170,7 +198,8 @@ namespace NetServer {
 			{{#vars}}
 			{{^primitive}}
 			if(this.{{name}} == var) {
-				writer.Write({{index}});
+				writer.Write((byte){{index}});
+				writer.Write((byte)1);
 			}
 			{{/primitive}}
 			{{/vars}}

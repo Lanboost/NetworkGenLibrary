@@ -16,24 +16,30 @@ namespace NetClient {
 		public Dictionary<uint, object> netObjects = new Dictionary<uint, object>();
 			
 		public void ReadTick(BinaryReader reader) {
-			uint netType = reader.ReadUInt32();
-			uint netId = reader.ReadUInt32();
-			bool fullObject = netId == UInt32.MaxValue;
-			
-			{{#objects}}
-			{{#netobject}}
-			if(netType == {{netType}}) {
-				if(fullObject) {	
-					var obj = new {{name}}();
-					obj.ReadObject(reader);
-					netObjects.Add(obj.netId, obj);
+			while (reader.BaseStream.Position != reader.BaseStream.Length)
+			{
+				uint netType = reader.ReadUInt32();
+				uint netId = reader.ReadUInt32();
+				bool fullObject = netId == UInt32.MaxValue;
+				
+				{{#objects}}
+				{{#netobject}}
+				if(netType == {{netType}}) {
+					if(fullObject) {	
+						netId = reader.ReadUInt32();
+						var obj = new {{name}}();
+						obj.ReadObject(reader);
+						obj.netId = netId;
+						netObjects.Add(obj.netId, obj);
+					}
+					else {
+						(({{name}}) netObjects[netId]).Read(reader);
+					}
 				}
-				else {
-					(({{name}}) netObjects[netId]).Read(reader);
-				}
+				{{/netobject}}
+				{{/objects}}
 			}
-			{{/netobject}}
-			{{/objects}}
+			reader.BaseStream.SetLength(0);
 		
 		}
 		
@@ -104,15 +110,21 @@ namespace NetClient {
 				this.{{name}} = {{readtype}}();
 				{{/primitive}}
 				{{^primitive}}
-				var isnull = reader.ReadByte() == 0;
-				if(isnull) {
+				var isnull = reader.ReadByte();
+				if(isnull == 0) {
 					this.{{name}} = null;
+				}
+				else if(isnull == 1) {
+					if(this.{{name}} == null) {
+						this.{{name}} = new {{type}}();
+					}
+					this.{{name}}.Read(reader);
 				}
 				else {
 					if(this.{{name}} == null) {
 						this.{{name}} = new {{type}}();
 					}
-					this.{{name}}.Read(reader);
+					this.{{name}}.ReadObject(reader);
 				}
 				{{/primitive}}
 			}

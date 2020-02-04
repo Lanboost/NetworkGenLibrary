@@ -342,9 +342,10 @@ def render(objects):
     for o in objects:
         vars = []
         for index,v in enumerate(o[2]):
-        
+            
             vars += [
                 {'name':v[2],
+                'first': True if index == 0 else False,
                 'type':v[0], 
                 'index':index, 
                 'primitive':is_primative(v[0]), 
