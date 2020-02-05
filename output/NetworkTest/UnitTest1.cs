@@ -153,11 +153,10 @@ namespace NetworkTest
 			NetServer.Main.players.Add(sock2.pid, p2);
 
 			p2.Write(sock2, sock2.tickStream);
-
-
-
-
 			var netreader = new NetClient.NetReader();
+			sock2.tickStream.BaseStream.Position = 0;
+			netreader.ReadTick(new BinaryReader(sock2.tickStream.BaseStream));
+			
 
 			//move player 2 close to player 1
 
@@ -171,6 +170,7 @@ namespace NetworkTest
 
 			Assert.AreEqual(2, netreader.netObjects.Count);
 			AssertPlayerEqual(p1, netreader.Get<NetClient.Player>(p1.netId));
+			AssertPlayerEqual(p2, netreader.Get<NetClient.Player>(p2.netId));
 
 			p1.SetName("Ian");
 
@@ -182,6 +182,126 @@ namespace NetworkTest
 			AssertPlayerEqual(p1, netreader.Get<NetClient.Player>(p1.netId));
 			AssertPlayerEqual(p2, netreader.Get<NetClient.Player>(p2.netId));
 
+		}
+
+
+
+
+		[TestMethod]
+		public void TestArrayDefaultRead()
+		{
+
+			var sock2 = new NetServer.Socket();
+			sock2.pid = 2;
+
+
+			var p2 = new NetServer.Player();
+			p2.netId = 11;
+			p2.InitName("");
+			p2.InitSocket(sock2);
+			p2.InitPosition(new NetServer.Position(0, 0, 0, 0, 0, 0));
+			p2.InitInventory(new NetServer.Inventory(new NetServer.Item[] { new NetServer.Item(0,0,1), new NetServer.Item(0, 0, 1) }, 111));
+
+			NetServer.Main.players.Add(sock2.pid, p2);
+
+			p2.Write(sock2, sock2.tickStream);
+			var netreader = new NetClient.NetReader();
+			sock2.tickStream.BaseStream.Position = 0;
+			netreader.ReadTick(new BinaryReader(sock2.tickStream.BaseStream));
+			AssertPlayerEqual(p2, netreader.Get<NetClient.Player>(p2.netId), false, false);
+		}
+
+		[TestMethod]
+		public void TestArrayChangeArray()
+		{
+
+			var sock2 = new NetServer.Socket();
+			sock2.pid = 2;
+
+
+			var p2 = new NetServer.Player();
+			p2.netId = 11;
+			p2.InitName("");
+			p2.InitSocket(sock2);
+			p2.InitPosition(new NetServer.Position(0, 0, 0, 0, 0, 0));
+			p2.InitInventory(new NetServer.Inventory(new NetServer.Item[] { new NetServer.Item(0, 0, 1), new NetServer.Item(0, 0, 1) }, 111));
+
+			NetServer.Main.players.Add(sock2.pid, p2);
+
+			p2.Write(sock2, sock2.tickStream);
+			var netreader = new NetClient.NetReader();
+			sock2.tickStream.BaseStream.Position = 0;
+			netreader.ReadTick(new BinaryReader(sock2.tickStream.BaseStream));
+			AssertPlayerEqual(p2, netreader.Get<NetClient.Player>(p2.netId), false, false);
+
+
+			p2.SetInventory(new NetServer.Inventory(new NetServer.Item[] { new NetServer.Item(0, 0, 1), new NetServer.Item(0, 0, 1) }, 222));
+
+			sock2.tickStream.BaseStream.Position = 0;
+			netreader.ReadTick(new BinaryReader(sock2.tickStream.BaseStream));
+			AssertPlayerEqual(p2, netreader.Get<NetClient.Player>(p2.netId), false, false);
+		}
+
+		[TestMethod]
+		public void TestArrayChangeArrayItem()
+		{
+
+			var sock2 = new NetServer.Socket();
+			sock2.pid = 2;
+
+
+			var p2 = new NetServer.Player();
+			p2.netId = 11;
+			p2.InitName("");
+			p2.InitSocket(sock2);
+			p2.InitPosition(new NetServer.Position(0, 0, 0, 0, 0, 0));
+			p2.InitInventory(new NetServer.Inventory(new NetServer.Item[] { new NetServer.Item(0, 0, 1), new NetServer.Item(0, 0, 1) }, 111));
+
+			NetServer.Main.players.Add(sock2.pid, p2);
+
+			p2.Write(sock2, sock2.tickStream);
+			var netreader = new NetClient.NetReader();
+			sock2.tickStream.BaseStream.Position = 0;
+			netreader.ReadTick(new BinaryReader(sock2.tickStream.BaseStream));
+			AssertPlayerEqual(p2, netreader.Get<NetClient.Player>(p2.netId), false, false);
+
+
+			p2.GetInventory().GetItems()[0].SetCount(2);
+
+			sock2.tickStream.BaseStream.Position = 0;
+			netreader.ReadTick(new BinaryReader(sock2.tickStream.BaseStream));
+			AssertPlayerEqual(p2, netreader.Get<NetClient.Player>(p2.netId), false, false);
+		}
+
+		[TestMethod]
+		public void TestArrayAssignArrayItem()
+		{
+
+			var sock2 = new NetServer.Socket();
+			sock2.pid = 2;
+
+
+			var p2 = new NetServer.Player();
+			p2.netId = 11;
+			p2.InitName("");
+			p2.InitSocket(sock2);
+			p2.InitPosition(new NetServer.Position(0, 0, 0, 0, 0, 0));
+			p2.InitInventory(new NetServer.Inventory(new NetServer.Item[] { new NetServer.Item(0, 0, 1), new NetServer.Item(0, 0, 1) }, 111));
+
+			NetServer.Main.players.Add(sock2.pid, p2);
+
+			p2.Write(sock2, sock2.tickStream);
+			var netreader = new NetClient.NetReader();
+			sock2.tickStream.BaseStream.Position = 0;
+			netreader.ReadTick(new BinaryReader(sock2.tickStream.BaseStream));
+			AssertPlayerEqual(p2, netreader.Get<NetClient.Player>(p2.netId), false, false);
+
+
+			p2.GetInventory().GetItems()[0] = new NetServer.Item(1, 1, 1);
+
+			sock2.tickStream.BaseStream.Position = 0;
+			netreader.ReadTick(new BinaryReader(sock2.tickStream.BaseStream));
+			AssertPlayerEqual(p2, netreader.Get<NetClient.Player>(p2.netId), false, false);
 		}
 	}
 }

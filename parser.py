@@ -346,6 +346,7 @@ def render(objects):
             vars += [
                 {'name':v[2],
                 'first': True if index == 0 else False,
+                'array':v[1], 
                 'type':v[0], 
                 'index':index, 
                 'primitive':is_primative(v[0]), 
