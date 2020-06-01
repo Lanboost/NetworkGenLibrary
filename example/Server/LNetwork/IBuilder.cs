@@ -10,4 +10,18 @@ namespace LNetwork
 	{
 		T Build();
 	}
+
+	public class BuilderWrapper<T>: IBuilder<T>
+	{
+		Func<T> func;
+		public BuilderWrapper(Func<T> func)
+		{
+			this.func = func;
+		}
+
+		public T Build()
+		{
+			return func();
+		}
+	}
 }

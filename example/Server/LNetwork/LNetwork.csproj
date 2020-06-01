@@ -63,6 +63,7 @@
     <Compile Include="service\ServerNetwork.cs" />
     <Compile Include="CurrentMillis.cs" />
     <Compile Include="service\SocketNetwork.cs" />
+    <Compile Include="test\TestHelper.cs" />
     <Compile Include="UIDCounter.cs" />
   </ItemGroup>
   <ItemGroup />

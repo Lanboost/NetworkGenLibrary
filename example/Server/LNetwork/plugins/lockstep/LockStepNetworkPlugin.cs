@@ -24,7 +24,7 @@ namespace LNetwork.lockstep
 	public interface ILockstepNetworkState
 	{
 		Func<T, uint> RegisterLockstep<T>(INetworkSocketHandler handler, uint packetId, Func<uint, T, bool> action);
-		void StepLockstep(INetworkSocketHandler handler, uint stepId);
+		Action<uint> RegisterStepHandler(INetworkSocketHandler handler, uint packetId, Action<uint> onStepUpdate);
 		bool IsMaster();
 		bool IsSlave();
 	}
@@ -46,11 +46,9 @@ namespace LNetwork.lockstep
 
 		UIDCounter ClientEventCounter = new UIDCounter();
 
-		public LockstepNetworkState(NetworkPacketIdGenerator idGenerator, Action<uint> onStepUpdate, bool asMaster)
+		public LockstepNetworkState(NetworkPacketIdGenerator idGenerator, bool asMaster)
 		{
 			PacketIdHandleAction = idGenerator.Register();
-			PacketIdStep = idGenerator.Register();
-			this.onStepUpdate = onStepUpdate;
 			this.AsMaster = asMaster;
 		}
 		
@@ -93,17 +91,25 @@ namespace LNetwork.lockstep
 			this.UnhandledEventIds.Remove(actionId);
 		}
 
-		public void StepLockstep(INetworkSocketHandler handler, uint stepId)
+		public Action<uint> RegisterStepHandler(INetworkSocketHandler handler, uint packetId, Action<uint> onStepUpdate)
 		{
+			PacketIdStep = packetId;
 			if (IsMaster())
 			{
-				//First thing we do in handle is to do the actions that are stored
-				//They are only stored on master, as master needs to execute the actions
-				//in the same pipeline order as slaves, aka actions in network handle.
+				return delegate (uint stepId)
+				{
+					//First thing we do in handle is to do the actions that are stored
+					//They are only stored on master, as master needs to execute the actions
+					//in the same pipeline order as slaves, aka actions in network handle.
 
-				onStepUpdate(stepId);
-				handler.BroadCast(PacketBuilder.New().Add((UInt32)PacketIdStep).Add((UInt32) stepId).Build());
+					onStepUpdate(stepId);
+					handler.BroadCast(PacketBuilder.New().Add((UInt32)PacketIdStep).Add((UInt32)stepId).Build());
+				};
 			}
+			return delegate (uint stepId)
+			{
+
+			};
 		}
 
 		public void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)

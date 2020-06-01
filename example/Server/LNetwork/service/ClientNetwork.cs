@@ -58,6 +58,8 @@ namespace LNetwork
 		NetworkSocketStateRouter router;
 		IBuilder<ClientSocket> clientSocketBuilder;
 
+		NetworkSocketState state;
+
 		public ClientNetwork(IBuilder<ClientSocket> clientSocketBuilder, NetworkPacketIdGenerator gen)
 		{
 			//Wrap socket in a RPC ping handler
@@ -142,7 +144,15 @@ namespace LNetwork
 
 		public void SetSocketState(uint socketId, NetworkSocketState networkSocketState)
 		{
-			throw new NotImplementedException();
+			if(state != null)
+			{
+				router.Detach(state);
+			}
+			this.state = networkSocketState;
+			if (state != null)
+			{
+				router.Attach(state);
+			}
 		}
 	}
 }
