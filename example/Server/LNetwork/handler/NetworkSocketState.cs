@@ -11,7 +11,7 @@ namespace LNetwork
 		void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader);
 	}
 
-	public class NetworkSocketStateRouter: NetworkSocketState
+	public class NetworkSocketStateRouter
 	{
 		Dictionary<uint, NetworkSocketState> Routes = new Dictionary<uint, NetworkSocketState>();
 
@@ -37,11 +37,10 @@ namespace LNetwork
 			{
 				Routes[packetId].Handle(handler, socketId, packetId, reader);
 			}
-		}
-
-		public uint[] PacketIdList()
-		{
-			return Routes.Keys.ToArray();
+			else
+			{
+				throw new System.Exception("No route for packet id");
+			}
 		}
 	}
 }

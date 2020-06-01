@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -11,20 +12,21 @@ namespace LNetwork.lockstep
 {
 	public class LockstepAction
 	{
-		public static Func<uint, BinaryReader, bool> Create<T>(Func<uint, T, bool> action)
+		public static Func<uint, byte[], bool> Create<T>(Func<uint, T, bool> action)
 		{
-			return delegate (uint SenderId, BinaryReader reader)
+			BinaryFormatter binaryFmt = new BinaryFormatter();
+			return delegate (uint SenderId, byte[] inputdata)
 			{
-				T Param1 = PacketBuilder.Read<T>(reader);
-				return action(SenderId, Param1);
+				T input = (T)binaryFmt.Deserialize(new MemoryStream(inputdata));
+				return action(SenderId, input);
 			};
 		}
 	}
 
 	public interface ILockstepNetworkState
 	{
-		Func<T, uint> RegisterLockstep<T>(INetworkSocketHandler handler, uint packetId, Func<uint, T, bool> action);
-		Action<uint> RegisterStepHandler(INetworkSocketHandler handler, uint packetId, Action<uint> onStepUpdate);
+		Func<T, uint> RegisterLockstep<T>(uint packetId, Func<uint, T, bool> action);
+		Action<uint> RegisterStepHandler(Action<uint> onStepUpdate);
 		bool IsMaster();
 		bool IsSlave();
 	}
@@ -33,6 +35,9 @@ namespace LNetwork.lockstep
 	{
 		uint PacketIdHandleAction;
 		uint PacketIdStep;
+		BinaryFormatter binaryFmt = new BinaryFormatter();
+
+		INetworkSocketHandler socketHandler;
 
 		uint ClientId;
 		Action<uint> onStepUpdate;
@@ -41,45 +46,58 @@ namespace LNetwork.lockstep
 
 		bool AsMaster;
 		
-		Dictionary<uint, Func<uint, BinaryReader, bool>> Actions = new Dictionary<uint, Func<uint, BinaryReader, bool>>();
+		Dictionary<uint, Func<uint, byte[], bool>> Actions = new Dictionary<uint, Func<uint, byte[], bool>>();
 		
 
 		UIDCounter ClientEventCounter = new UIDCounter();
 
-		public LockstepNetworkState(NetworkPacketIdGenerator idGenerator, bool asMaster)
+		public LockstepNetworkState(uint PacketIdStep, uint PacketIdHandleAction, bool asMaster)
 		{
-			PacketIdHandleAction = idGenerator.Register();
+			this.PacketIdStep = PacketIdStep;
+			this.PacketIdHandleAction = PacketIdHandleAction;
+			
+
 			this.AsMaster = asMaster;
+		}
+
+		public void Bind(INetworkSocketHandler socketHandler)
+		{
+			this.socketHandler = socketHandler;
 		}
 		
 
 		/*
 		 * Returns a Function that takes X parameters and return the async ID of the request
 		 */
-		public Func<T, uint> RegisterLockstep<T>(INetworkSocketHandler handler, uint packetId, Func<uint, T, bool> action)
+		public Func<T, uint> RegisterLockstep<T>(uint packetId, Func<uint, T, bool> action)
 		{
 
 			Actions.Add(packetId, LockstepAction.Create<T>(action));
 
-			return delegate(T param1)
+			return delegate(T input)
 			{
+				MemoryStream memory = new MemoryStream();
+
+				binaryFmt.Serialize(memory, input);
+				byte[] inputdata = memory.ToArray();
+
 				if (!IsMaster())
 				{
 					uint ClientEventId = ClientEventCounter.Get();
 					UnhandledEventIds.Add(ClientEventId);
 
-					byte[] packet = PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)ClientEventId).Add(param1).Build();
+					byte[] packet = PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)ClientEventId).Add((UInt32)inputdata.Length).Add(inputdata).Build();
 
-					handler.Send(packet);
+					socketHandler.Send(0, packet);
 					return ClientEventId;
 				}
 				else
 				{
-					action.Invoke(ClientId, param1);
+					action.Invoke(ClientId, input);
 
-					byte[] packet = PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)ClientId).Add(param1).Build();
+					byte[] packet = PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)ClientId).Add((UInt32)inputdata.Length).Add(inputdata).Build();
 
-					handler.BroadCast(packet);
+					((INetworkSocketHandlerServer)socketHandler).BroadCast(packet);
 
 					return 0;
 				}
@@ -91,9 +109,9 @@ namespace LNetwork.lockstep
 			this.UnhandledEventIds.Remove(actionId);
 		}
 
-		public Action<uint> RegisterStepHandler(INetworkSocketHandler handler, uint packetId, Action<uint> onStepUpdate)
+		public Action<uint> RegisterStepHandler(Action<uint> onStepUpdate)
 		{
-			PacketIdStep = packetId;
+			this.onStepUpdate = onStepUpdate;
 			if (IsMaster())
 			{
 				return delegate (uint stepId)
@@ -103,7 +121,7 @@ namespace LNetwork.lockstep
 					//in the same pipeline order as slaves, aka actions in network handle.
 
 					onStepUpdate(stepId);
-					handler.BroadCast(PacketBuilder.New().Add((UInt32)PacketIdStep).Add((UInt32)stepId).Build());
+					((INetworkSocketHandlerServer)socketHandler).BroadCast(PacketBuilder.New().Add((UInt32)PacketIdStep).Add((UInt32)stepId).Build());
 				};
 			}
 			return delegate (uint stepId)
@@ -142,12 +160,15 @@ namespace LNetwork.lockstep
 					{
 						uint eventId = reader.ReadUInt32();
 						handler.Send(socketId, PacketBuilder.New().Add((UInt32)PacketIdHandleAction).Add((UInt32)eventId).Build());
-						long position = reader.BaseStream.Position;
-						if (Actions[packetId].Invoke(socketId, reader))
+
+
+						uint length = reader.ReadUInt32();
+						byte[] data = new byte[length];
+						reader.Read(data, 0, (int)length);
+
+						if (Actions[packetId].Invoke(socketId, data))
 						{
-							reader.BaseStream.Position = position;
-							byte[] data = reader.ReadBytes((int)(reader.BaseStream.Length - reader.BaseStream.Position));
-							handler.BroadCast(PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)socketId).Add(data).Build());
+							((INetworkSocketHandlerServer)socketHandler).BroadCast(PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)socketId).Add((UInt32)data.Length).Add(data).Build());
 						}
 					}
 					else
@@ -160,7 +181,12 @@ namespace LNetwork.lockstep
 					if (Actions.ContainsKey(packetId))
 					{
 						uint sender = reader.ReadUInt32();
-						Actions[packetId].Invoke(sender, reader);
+
+						uint length = reader.ReadUInt32();
+						byte[] data = new byte[length];
+						reader.Read(data, 0, (int)length);
+
+						Actions[packetId].Invoke(sender, data);
 					}
 					else
 					{

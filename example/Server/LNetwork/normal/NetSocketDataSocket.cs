@@ -8,7 +8,7 @@ using System.Text;
 
 namespace LNetwork.normal
 {
-    class NetSocketDataSocket : DataSocket
+	public class NetSocketDataSocket : DataSocket
     {
 
         static readonly object _object = new object();

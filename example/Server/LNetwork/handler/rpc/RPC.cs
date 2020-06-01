@@ -12,8 +12,8 @@ namespace LNetwork
 {
 	public interface IRPCNetworkSocketState: NetworkSocketState
 	{
-		Func<INetworkSocketHandler, uint, I, Action<O>, uint> RegisterRPCDual<I, O>(uint packetId1, uint packetId2, Func<uint, uint, I, O> handler);
-		Func<INetworkSocketHandler, uint, I, Action<O>, uint> RegisterRPC<I, O>(uint packetId);
+		Func<uint, I, Action<O>, uint> RegisterRPCDual<I, O>(uint packetId1, uint packetId2, Func<uint, uint, I, O> handler);
+		Func<uint, I, Action<O>, uint> RegisterRPC<I, O>(uint packetId);
 		void RegisterRPCHandler<I, O>(uint packetId, Func<uint, uint, I, O> handler);
 
 	}
@@ -32,7 +32,18 @@ namespace LNetwork
 
 	public class StandardRPCNetworkSocketState : IRPCNetworkSocketState, NetworkSocketState
 	{
+		INetworkSocketHandler socketHandler;
 
+		public StandardRPCNetworkSocketState()
+		{
+			
+		}
+
+		public void Bind(INetworkSocketHandler socketHandler)
+		{
+			this.socketHandler = socketHandler;
+		}
+		List<uint> packetIds = new List<uint>();
 		Dictionary<uint, RPCMethodData> RPCMethods = new Dictionary<uint, RPCMethodData>();
 		Dictionary<uint, Action<byte[]>> MessageCallbacks = new Dictionary<uint, Action<byte[]>>();
 
@@ -40,7 +51,9 @@ namespace LNetwork
 
 		BinaryFormatter binaryFmt = new BinaryFormatter();
 
-		public Func<INetworkSocketHandler, uint, I, Action<O>, uint> RegisterRPCDual<I, O>(uint packetId1, uint packetId2, Func<uint, uint, I, O> handler)
+		
+
+		public Func<uint, I, Action<O>, uint> RegisterRPCDual<I, O>(uint packetId1, uint packetId2, Func<uint, uint, I, O> handler)
 		{
 			RegisterRPCHandler(packetId1, packetId2, handler);
 			return RegisterRPC<I,O>(packetId1);
@@ -48,6 +61,11 @@ namespace LNetwork
 
 		private void RegisterRPCHandler<I, O>(uint packetId1, uint packetId2, Func<uint, uint, I, O> handler)
 		{
+			packetIds.Add(packetId1);
+			if (packetId1 != packetId2)
+			{
+				packetIds.Add(packetId2);
+			}
 			RPCMethods.Add(packetId1, new RPCMethodData(packetId2,
 				delegate (uint socketId, uint messageId, byte[] inputdata)
 				{
@@ -63,10 +81,10 @@ namespace LNetwork
 				}));
 		}
 
-		public Func<INetworkSocketHandler, uint, I, Action<O>, uint> RegisterRPC<I, O>(uint packetId)
+		public Func<uint, I, Action<O>, uint> RegisterRPC<I, O>(uint packetId)
 		{
-
-			return delegate (INetworkSocketHandler handler, uint socketId, I input, Action<O> callback)
+			packetIds.Add(packetId);
+			return delegate (uint socketId, I input, Action<O> callback)
 			{
 				uint MessageId = MessageIdCounter.Get();
 				MemoryStream memory = new MemoryStream();
@@ -82,7 +100,7 @@ namespace LNetwork
 					}
 				);
 
-				handler.Send(socketId, PacketBuilder.New().Add<UInt32>(packetId).Add(MessageId).Add<UInt32>((uint)inputdata.Length).Add(inputdata).Build());
+				socketHandler.Send(socketId, PacketBuilder.New().Add<UInt32>(packetId).Add(MessageId).Add<UInt32>((uint)inputdata.Length).Add(inputdata).Build());
 
 				return MessageId;
 			};
@@ -122,7 +140,7 @@ namespace LNetwork
 
 		public uint[] PacketIdList()
 		{
-			return RPCMethods.Keys.ToArray();
+			return packetIds.ToArray();
 		}
 	}
 }

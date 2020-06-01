@@ -9,7 +9,7 @@ using Moq;
 namespace TestLNetwork
 {
 	[TestClass]
-	public class TestrNetworks
+	public class TestNetworks
 	{
 		[TestMethod]
 		public void TestClientNetwork()
@@ -30,9 +30,7 @@ namespace TestLNetwork
 			Mock<IBuilder<ClientSocket>> mockClientSocketBuilder = new Mock<IBuilder<ClientSocket>>();
 			mockClientSocketBuilder.Setup(x => x.Build()).Returns(mockClientSocket.Object);
 
-
-			StandardNetworkPacketIdGenerator clientPacketGenerator = new StandardNetworkPacketIdGenerator();
-			ClientNetwork clientNetwork = new ClientNetwork(mockClientSocketBuilder.Object, clientPacketGenerator);
+			ClientNetwork clientNetwork = new ClientNetwork(mockClientSocketBuilder.Object);
 
 			clientNetwork.Connect(host, port);
 
@@ -67,13 +65,12 @@ namespace TestLNetwork
 			mockSocketBuilder.Setup(x => x.Build()).Returns(mockSocket.Object);
 
 
-			Mock<NetworkSocketState> mockNetworkSocketState = new Mock<NetworkSocketState>();
-			Mock<IBuilder<NetworkSocketState>> mockNetworkSocketStateBuilder = new Mock<IBuilder<NetworkSocketState>>();
-			mockNetworkSocketStateBuilder.Setup(x => x.Build()).Returns(mockNetworkSocketState.Object);
+			ServerNetwork serverNetwork = new ServerNetwork(
+				mockSocketBuilder.Object, 
+				delegate(uint socketId, DataSocket socket, NetworkSocketStateRouter rotuer)
+			{
 
-
-			StandardNetworkPacketIdGenerator packetGenerator = new StandardNetworkPacketIdGenerator();
-			ServerNetwork serverNetwork = new ServerNetwork(packetGenerator, mockSocketBuilder.Object, mockNetworkSocketStateBuilder.Object);
+			});
 
 			serverNetwork.Listen(port);
 
@@ -86,8 +83,7 @@ namespace TestLNetwork
 
 			serverNetwork.Send(first.Item1, toSend);
 			serverNetwork.BroadCast(toSend);
-
-			Assert.AreEqual(mockNetworkSocketState.Object, serverNetwork.GetSocketState(first.Item1));
+			
 
 			mockSocket.Verify(x => x.listen(port));
 			mockDataSocket.Verify(m => m.send(toSend), Times.Exactly(2));

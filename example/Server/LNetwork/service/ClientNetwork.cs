@@ -12,13 +12,14 @@ namespace LNetwork
 
 	public class PingNetworkState : NetworkSocketState
 	{
-		IRPCNetworkSocketState rpcState;
-		Func<INetworkSocketHandler, uint, PingPacket, Action<PingResponse>, uint> pingRpc;
+		StandardRPCNetworkSocketState rpcState;
+		Func<uint, PingPacket, Action<PingResponse>, uint> pingRpc;
 
-		public PingNetworkState(NetworkPacketIdGenerator gen, uint pollTime = 1000*30, uint timeout = 1000*60)
+		public PingNetworkState(INetworkSocketHandler handler, uint sendPacketId, uint respondPacketId, uint pollTime = 1000*30, uint timeout = 1000*60)
 		{
 			rpcState = new StandardRPCNetworkSocketState();
-			pingRpc = rpcState.RegisterRPCDual<PingPacket, PingResponse>(gen.Register(), gen.Register(), 
+			rpcState.Bind(handler);
+			pingRpc = rpcState.RegisterRPCDual<PingPacket, PingResponse>(sendPacketId, respondPacketId, 
 				delegate(uint socketId, uint packetId, PingPacket pingPacket) {
 
 					
@@ -50,7 +51,7 @@ namespace LNetwork
 		}
 	}
 
-	public class ClientNetwork: INetworkSocketHandler
+	public class ClientNetwork: INetworkSocketHandler, INetworkSocketHandlerClient
 	{
 		ClientSocket ClientSocket;
 		DataSocket socket;
@@ -58,22 +59,12 @@ namespace LNetwork
 		NetworkSocketStateRouter router;
 		IBuilder<ClientSocket> clientSocketBuilder;
 
-		NetworkSocketState state;
-
-		public ClientNetwork(IBuilder<ClientSocket> clientSocketBuilder, NetworkPacketIdGenerator gen)
+		public ClientNetwork(IBuilder<ClientSocket> clientSocketBuilder)
 		{
-			//Wrap socket in a RPC ping handler
 			router = new NetworkSocketStateRouter();
-			var pingState = new PingNetworkState(gen);
-			router.Attach(pingState);
 
 			this.clientSocketBuilder = clientSocketBuilder;
 
-		}
-
-		public void BroadCast(byte[] msg)
-		{
-			throw new NotImplementedException();
 		}
 
 		public void Connect(string host, int port)
@@ -82,22 +73,12 @@ namespace LNetwork
 			ClientSocket.connect(host, port);
 		}
 
-		public DataSocket GetSocket(uint socketId)
+		public DataSocket GetSocket()
 		{
-			throw new NotImplementedException();
+			return socket;
 		}
-
-		public int GetSocketCount()
-		{
-			throw new NotImplementedException();
-		}
-
-		public IEnumerable<Tuple<uint, DataSocket>> GetSockets()
-		{
-			throw new NotImplementedException();
-		}
-
-		public NetworkSocketState GetSocketState(uint socketId)
+		
+		public NetworkSocketStateRouter GetSocketRouter()
 		{
 			return router;
 		}
@@ -139,20 +120,7 @@ namespace LNetwork
 
 		public void Send(uint socketId, byte[] msg)
 		{
-			Send(msg);
-		}
-
-		public void SetSocketState(uint socketId, NetworkSocketState networkSocketState)
-		{
-			if(state != null)
-			{
-				router.Detach(state);
-			}
-			this.state = networkSocketState;
-			if (state != null)
-			{
-				router.Attach(state);
-			}
+			socket.send(msg);
 		}
 	}
 }

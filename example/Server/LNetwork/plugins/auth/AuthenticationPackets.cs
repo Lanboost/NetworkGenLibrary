@@ -10,8 +10,8 @@ namespace LNetwork.plugins.auth
 	[Serializable]
 	public struct LoginPacket
 	{
-		string username;
-		string password;
+		public string username;
+		public string password;
 
 		public LoginPacket(string username, string password)
 		{
@@ -23,7 +23,13 @@ namespace LNetwork.plugins.auth
 	[Serializable]
 	public struct LoginResponsePacket
 	{
-		bool success;
-		string failureReason;
+		public bool success;
+		public string failureReason;
+
+		public LoginResponsePacket(bool success, string failureReason = "")
+		{
+			this.success = success;
+			this.failureReason = failureReason;
+		}
 	}
 }

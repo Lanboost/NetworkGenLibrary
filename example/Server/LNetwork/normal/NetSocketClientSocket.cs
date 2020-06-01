@@ -8,7 +8,7 @@ using System.Text;
 
 namespace LNetwork.normal
 {
-    class NetSocketClientSocket: ClientSocket
+	public class NetSocketClientSocket: ClientSocket
     {
         Socket socket;
         SocketAsyncEventArgs asyncevent = new SocketAsyncEventArgs();

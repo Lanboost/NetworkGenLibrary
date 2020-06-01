@@ -62,6 +62,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ITTest.cs" />
     <Compile Include="TestLockStep.cs" />
     <Compile Include="TestNetworkState.cs" />
     <Compile Include="TestServerNetwork.cs" />

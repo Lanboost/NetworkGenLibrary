@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace LNetwork.test
 {
+	/*
 	public class MockedDirectDataSocket : DataSocket
 	{
 		public void SetDirection(MockedDirectDataSocket socket)
@@ -198,7 +199,5 @@ namespace LNetwork.test
 			clients.Add(c);
 			return c;
 		}
-
-		
-	}
+	}*/
 }

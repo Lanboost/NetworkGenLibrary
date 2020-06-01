@@ -10,29 +10,36 @@ namespace LNetwork.plugins.auth
 {
 	public class AuthenticationClientPlugin : NetworkSocketState
 	{
-		IRPCNetworkSocketState socketNetwork;
-		Func<INetworkSocketHandler, uint, LoginPacket, Action<LoginResponsePacket>, uint> loginRPC;
+		StandardRPCNetworkSocketState rpcstate;
+		Func<uint, LoginPacket, Action<LoginResponsePacket>, uint> loginRPC;
 		Action<LoginResponsePacket> loginCallback;
 
-		public AuthenticationClientPlugin(NetworkPacketIdGenerator generator, IRPCNetworkSocketState socketNetwork, Action<LoginResponsePacket> loginCallback)
+		public AuthenticationClientPlugin(uint authenticationPacketId, Action<LoginResponsePacket> loginCallback)
 		{
+
+			rpcstate = new StandardRPCNetworkSocketState();
 			this.loginCallback = loginCallback;
-			loginRPC = socketNetwork.RegisterRPC<LoginPacket, LoginResponsePacket>(generator.Register());
+			loginRPC = rpcstate.RegisterRPC<LoginPacket, LoginResponsePacket>(authenticationPacketId);
+		}
+
+		public void Bind(INetworkSocketHandler socketHandler)
+		{
+			rpcstate.Bind(socketHandler);
 		}
 
 		public void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
 		{
-			socketNetwork.Handle(handler, socketId, packetId, reader);
+			rpcstate.Handle(handler, socketId, packetId, reader);
 		}
 
 		public uint[] PacketIdList()
 		{
-			return socketNetwork.PacketIdList();
+			return rpcstate.PacketIdList();
 		}
 
-		public void Login(INetworkSocketHandler handler, string username, string password)
+		public void Login(string username, string password)
 		{
-			loginRPC.Invoke(handler, uint.MaxValue, new LoginPacket(username, password), loginCallback);
+			loginRPC.Invoke(0, new LoginPacket(username, password), loginCallback);
 		}
 
 
@@ -40,20 +47,26 @@ namespace LNetwork.plugins.auth
 
 	public class AuthenticationServerPlugin : NetworkSocketState
 	{
-		IRPCNetworkSocketState socketNetwork;
-		public AuthenticationServerPlugin(NetworkPacketIdGenerator generator, IRPCNetworkSocketState socketNetwork, Func<uint, uint, LoginPacket, LoginResponsePacket> handler)
+		StandardRPCNetworkSocketState rpcstate;
+		public AuthenticationServerPlugin(uint authenticationPacketId, Func<uint, uint, LoginPacket, LoginResponsePacket> handler)
 		{
-			socketNetwork.RegisterRPCHandler<LoginPacket, LoginResponsePacket>(generator.Register(), handler);
+			rpcstate = new StandardRPCNetworkSocketState();
+			rpcstate.RegisterRPCHandler<LoginPacket, LoginResponsePacket>(authenticationPacketId, handler);
+		}
+
+		public void Bind(INetworkSocketHandler socketHandler)
+		{
+			rpcstate.Bind(socketHandler);
 		}
 
 		public void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
 		{
-			socketNetwork.Handle(handler, socketId, packetId, reader);
+			rpcstate.Handle(handler, socketId, packetId, reader);
 		}
 
 		public uint[] PacketIdList()
 		{
-			return socketNetwork.PacketIdList();
+			return rpcstate.PacketIdList();
 		}
 	}
 }

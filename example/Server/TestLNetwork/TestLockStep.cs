@@ -1,6 +1,5 @@
 ﻿using LNetwork;
 using LNetwork.lockstep;
-using LNetwork.test;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
@@ -35,6 +34,7 @@ namespace TestLNetwork
 
 	}
 
+	/*
 	public class LockstepGame
 	{
 
@@ -52,8 +52,6 @@ namespace TestLNetwork
 
 		public LockstepGame(AutoConnectedNetwork network, bool master)
 		{
-			state = new LockstepNetworkState(clientPacketGenerator, master);
-
 			if (master)
 			{
 				handler = network.GetServer(clientPacketGenerator, delegate () { return state; });
@@ -63,9 +61,12 @@ namespace TestLNetwork
 				handler = network.GetClient(clientPacketGenerator, state);
 			}
 
-			action1 = state.RegisterLockstep(handler, clientPacketGenerator.Register(), delegate (uint socketId, uint actionValue) { game.Action1(); return true; });
-			action2 = state.RegisterLockstep(handler, clientPacketGenerator.Register(), delegate (uint socketId, uint actionValue) { game.Action2(actionValue); return true; });
-			tick = state.RegisterStepHandler(handler, clientPacketGenerator.Register(), delegate (uint tick) { game.Tick(tick); });
+			state = new LockstepNetworkState(handler, clientPacketGenerator.Register(), clientPacketGenerator.Register(), master);
+
+
+			action1 = state.RegisterLockstep(clientPacketGenerator.Register(), delegate (uint socketId, uint actionValue) { game.Action1(); return true; });
+			action2 = state.RegisterLockstep(clientPacketGenerator.Register(), delegate (uint socketId, uint actionValue) { game.Action2(actionValue); return true; });
+			tick = state.RegisterStepHandler(clientPacketGenerator.Register(), delegate (uint tick) { game.Tick(tick); });
 			
 		}
 
@@ -73,39 +74,295 @@ namespace TestLNetwork
 	}
 
 	
+	*/
 
 	[TestClass]
 	public class TestLockStep
 	{
 
 		[TestMethod]
-		public void TestLockStepLocking()
+		public void TestLockstepActionMaster()
 		{
-			var network = new AutoConnectedNetwork();
+			uint SendPacketId = 0;
+			uint TickPacketId =1;
+			uint ActionPacketId =2;
+			uint SendValue = 100;
 
-			var lockstep1 = new LockstepGame(network, true);
-			var lockstep2 = new LockstepGame(network, false);
-			var lockstep3 = new LockstepGame(network, false);
+			uint masterValue = 0;
+			uint slaveValue = 0;
+
+
+			Mock<INetworkSocketHandlerServer> mockClientHandler1 = new Mock<INetworkSocketHandlerServer>();
+			Mock<INetworkSocketHandler> mockClientHandler2 = new Mock<INetworkSocketHandler>();
+
+			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, true);
+			lockstep1.Bind(mockClientHandler1.Object);
+			var masterActionCall = lockstep1.RegisterLockstep<TempSend>(ActionPacketId, delegate(uint socketId, TempSend send)
+			{
+				masterValue = send.value;
+				return true;
+			});
+
+			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, false);
+			lockstep2.Bind(mockClientHandler2.Object);
+			var slaveActionCall = lockstep2.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
+			{
+				slaveValue = send.value;
+				return true;
+			});
+
+			mockClientHandler2.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep1.Handle(mockClientHandler1.Object, socketId, packetId, reader);
+			});
+
+
+
+			mockClientHandler1.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep2.Handle(mockClientHandler2.Object, 0, packetId, reader);
+			});
+
+			mockClientHandler1.Setup(x => x.BroadCast(It.IsAny<byte[]>())).Callback(delegate (byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep2.Handle(mockClientHandler2.Object, 0, packetId, reader);
+			});
+
+
+
+
+
+			masterActionCall(new TempSend(SendValue));
+
+			Assert.AreEqual(SendValue, masterValue);
+			Assert.AreEqual(SendValue, slaveValue);
 			
 
+		}
 
-			for (uint i=0; i<=10; i++)
+
+		[TestMethod]
+		public void TestLockstepActionSlave()
+		{
+			uint SendPacketId = 0;
+			uint TickPacketId = 1;
+			uint ActionPacketId = 2;
+			uint SendValue = 100;
+
+			uint masterValue = 0;
+			uint slaveValue = 0;
+
+
+			Mock<INetworkSocketHandlerServer> mockClientHandler1 = new Mock<INetworkSocketHandlerServer>();
+			Mock<INetworkSocketHandler> mockClientHandler2 = new Mock<INetworkSocketHandler>();
+
+			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, true);
+			lockstep1.Bind(mockClientHandler1.Object);
+			var masterActionCall = lockstep1.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
 			{
-				lockstep1.tick(i);
-			}
+				masterValue = send.value;
+				return true;
+			});
 
-			Assert.AreEqual((UInt32) 10, lockstep1.game.ticks);
-			Assert.AreEqual((UInt32) 10, lockstep2.game.ticks);
-			Assert.AreEqual((UInt32)10, lockstep3.game.ticks);
+			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, false);
+			lockstep2.Bind(mockClientHandler2.Object);
+			var slaveActionCall = lockstep2.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
+			{
+				slaveValue = send.value;
+				return true;
+			});
+
+			mockClientHandler2.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep1.Handle(mockClientHandler1.Object, socketId, packetId, reader);
+			});
 
 
-			lockstep1.tick(100);
-			lockstep1.action1(0);
 
-			Assert.AreEqual((UInt32)100, lockstep1.game.action1);
-			Assert.AreEqual((UInt32)100, lockstep2.game.action1);
-			Assert.AreEqual((UInt32)100, lockstep3.game.action1);
+			mockClientHandler1.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep2.Handle(mockClientHandler2.Object, 0, packetId, reader);
+			});
 
+			mockClientHandler1.Setup(x => x.BroadCast(It.IsAny<byte[]>())).Callback(delegate (byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep2.Handle(mockClientHandler2.Object, 0, packetId, reader);
+			});
+
+
+
+
+
+			slaveActionCall(new TempSend(SendValue));
+
+			Assert.AreEqual(SendValue, masterValue);
+			Assert.AreEqual(SendValue, slaveValue);
+		}
+
+		[TestMethod]
+		public void TestLockstepUpdate()
+		{
+			uint SendPacketId = 0;
+			uint TickPacketId = 1;
+			uint ActionPacketId = 2;
+			uint SendValue = 100;
+
+			uint masterValue = 0;
+			uint slaveValue = 0;
+
+			uint masterTick = 0;
+			uint slaveTick = 0;
+
+
+			Mock<INetworkSocketHandlerServer> mockClientHandler1 = new Mock<INetworkSocketHandlerServer>();
+			Mock<INetworkSocketHandler> mockClientHandler2 = new Mock<INetworkSocketHandler>();
+
+			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, true);
+			lockstep1.Bind(mockClientHandler1.Object);
+			var masterActionCall = lockstep1.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
+			{
+				masterValue = send.value;
+				return true;
+			});
+
+			var masterStep = lockstep1.RegisterStepHandler(delegate (uint stepId) { masterTick = stepId; });
+
+			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, false);
+			lockstep2.Bind(mockClientHandler2.Object);
+			var slaveActionCall = lockstep2.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
+			{
+				slaveValue = send.value;
+				return true;
+			});
+
+			var slaveStep = lockstep2.RegisterStepHandler(delegate (uint stepId) { slaveTick = stepId; });
+
+			mockClientHandler2.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep1.Handle(mockClientHandler1.Object, socketId, packetId, reader);
+			});
+
+
+
+			mockClientHandler1.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep2.Handle(mockClientHandler2.Object, 0, packetId, reader);
+			});
+
+			mockClientHandler1.Setup(x => x.BroadCast(It.IsAny<byte[]>())).Callback(delegate (byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep2.Handle(mockClientHandler2.Object, 0, packetId, reader);
+			});
+
+
+			masterStep(0);
+			slaveStep(10);
+
+			Assert.AreEqual((uint)0, masterTick);
+			Assert.AreEqual((uint)0, slaveTick);
+
+			masterStep(10);
+
+			Assert.AreEqual((uint)10, masterTick);
+			Assert.AreEqual((uint)10, slaveTick);
+		}
+
+		[TestMethod]
+		public void TestLockstepActionCorrectTickUpdate()
+		{
+			uint SendPacketId = 0;
+			uint TickPacketId = 1;
+			uint ActionPacketId = 2;
+			uint SendValue = 100;
+
+			uint masterValue = 0;
+			uint slaveValue = 0;
+
+			uint masterTick = 0;
+			uint slaveTick = 0;
+
+
+			Mock<INetworkSocketHandlerServer> mockClientHandler1 = new Mock<INetworkSocketHandlerServer>();
+			Mock<INetworkSocketHandler> mockClientHandler2 = new Mock<INetworkSocketHandler>();
+
+			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, true);
+			lockstep1.Bind(mockClientHandler1.Object);
+			var masterActionCall = lockstep1.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
+			{
+				masterValue = masterTick;
+				return true;
+			});
+
+			var masterStep = lockstep1.RegisterStepHandler(delegate (uint stepId) { masterTick = stepId; });
+
+			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, false);
+			lockstep2.Bind(mockClientHandler2.Object);
+			var slaveActionCall = lockstep2.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
+			{
+				slaveValue = slaveTick;
+				return true;
+			});
+
+			var slaveStep = lockstep2.RegisterStepHandler(delegate (uint stepId) { slaveTick = stepId; });
+
+			mockClientHandler2.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep1.Handle(mockClientHandler1.Object, socketId, packetId, reader);
+			});
+
+
+
+			mockClientHandler1.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep2.Handle(mockClientHandler2.Object, 0, packetId, reader);
+			});
+
+			mockClientHandler1.Setup(x => x.BroadCast(It.IsAny<byte[]>())).Callback(delegate (byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				lockstep2.Handle(mockClientHandler2.Object, 0, packetId, reader);
+			});
+
+
+			masterStep(10);
+
+			Assert.AreEqual((uint)10, masterTick);
+			Assert.AreEqual((uint)10, slaveTick);
+
+			slaveActionCall(new TempSend(10));
+
+			Assert.AreEqual((uint)10, masterValue);
+			Assert.AreEqual((uint)10, slaveValue);
+
+			masterStep(11);
+
+			masterActionCall(new TempSend(10));
+
+			Assert.AreEqual((uint)11, masterValue);
+			Assert.AreEqual((uint)11, slaveValue);
 		}
 
 	}

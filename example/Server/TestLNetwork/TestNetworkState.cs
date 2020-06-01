@@ -44,10 +44,15 @@ namespace TestLNetwork
 			uint SendValue = 100;
 			uint ReceiveValue = 101;
 
+			Mock<INetworkSocketHandler> mockClientHandler1 = new Mock<INetworkSocketHandler>();
+			Mock<INetworkSocketHandler> mockClientHandler2 = new Mock<INetworkSocketHandler>();
+
 			StandardRPCNetworkSocketState rpc1 = new StandardRPCNetworkSocketState();
+			rpc1.Bind(mockClientHandler1.Object);
 			var clientCall = rpc1.RegisterRPC<TempSend, TempReceive>(SendPacketId);
 
 			StandardRPCNetworkSocketState rpc2 = new StandardRPCNetworkSocketState();
+			rpc2.Bind(mockClientHandler2.Object);
 			rpc2.RegisterRPCHandler<TempSend, TempReceive>(SendPacketId, delegate(uint socketId, uint packetId, TempSend ind)
 			{
 
@@ -58,17 +63,23 @@ namespace TestLNetwork
 				return outd;
 			});
 
-			Mock<INetworkSocketHandler> mockClientHandler = new Mock<INetworkSocketHandler>();
-			mockClientHandler.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			mockClientHandler2.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
 			{
 				BinaryReader reader = new BinaryReader(new MemoryStream(message));
 				uint packetId = reader.ReadUInt32();
-				rpc2.Handle(mockClientHandler.Object, socketId, packetId, reader);
+				rpc1.Handle(mockClientHandler1.Object, socketId, packetId, reader);
+			});
+
+			mockClientHandler1.Setup(x => x.Send(It.IsAny<UInt32>(), It.IsAny<byte[]>())).Callback(delegate (uint socketId, byte[] message)
+			{
+				BinaryReader reader = new BinaryReader(new MemoryStream(message));
+				uint packetId = reader.ReadUInt32();
+				rpc2.Handle(mockClientHandler2.Object, socketId, packetId, reader);
 			});
 
 			var wasCalled = false;
 
-			clientCall.Invoke(mockClientHandler.Object, SendPacketId, new TempSend(SendValue), delegate (TempReceive receive)
+			clientCall.Invoke(SendPacketId, new TempSend(SendValue), delegate (TempReceive receive)
 			{
 				wasCalled = true;
 				Assert.AreEqual(ReceiveValue, receive.value);
