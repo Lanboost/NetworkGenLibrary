@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using LNetwork;
 using LNetwork.service;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -8,81 +9,88 @@ using Moq;
 namespace TestLNetwork
 {
 	[TestClass]
-	public class TestServerNetwork
+	public class TestrNetworks
 	{
 		[TestMethod]
-		public void TestLoginOk()
+		public void TestClientNetwork()
 		{
+			byte[] toSend = new byte[10];
+			string host = "asd";
+			int port = 1000;
+
 			Mock<DataSocket> mockDataSocket = new Mock<DataSocket>();
 
-			mockDataSocket.Setup(m => m.handle());
-			mockDataSocket.SetupSequence(m => m.getMessage()).Returns(
-				PacketBuilder.New().Add<Int32>(PacketIds.PACKET_ID_CLIENT_LOGIN).Add("A").Add("B").Build()
-				).Returns((byte[])null);
+			mockDataSocket.Setup(x => x.getMessage()).Returns<byte[]>(null);
 
-			Mock<ServerSocket> mockServerSocket = new Mock<ServerSocket>();
-			mockServerSocket.Setup(m => m.listen(0));
-			mockServerSocket.Setup(m => m.handle()).Returns(mockDataSocket.Object);
+			Mock<ClientSocket> mockClientSocket = new Mock<ClientSocket>();
 
+			mockClientSocket.Setup(x => x.connect(It.IsAny<string>(), It.IsAny<Int32>()));
+			mockClientSocket.Setup(x => x.handle()).Returns(mockDataSocket.Object);
 
-			Mock<ServerNetworkListener> mockServerNetworkListener = new Mock<ServerNetworkListener>();
-			mockServerNetworkListener.Setup(m => m.OnConnected(It.IsAny<int>()));
-			mockServerNetworkListener.Setup(m => m.OnLogin(It.IsAny<int>(), "A","B")).Returns(ServerNetworkLoginResponse.OK);
+			Mock<IBuilder<ClientSocket>> mockClientSocketBuilder = new Mock<IBuilder<ClientSocket>>();
+			mockClientSocketBuilder.Setup(x => x.Build()).Returns(mockClientSocket.Object);
 
 
-			Mock<ServerSocketBuilder> mockServerSocketBuilder = new Mock<ServerSocketBuilder>();
-			mockServerSocketBuilder.Setup(m => m.Build()).Returns(mockServerSocket.Object);
+			StandardNetworkPacketIdGenerator clientPacketGenerator = new StandardNetworkPacketIdGenerator();
+			ClientNetwork clientNetwork = new ClientNetwork(mockClientSocketBuilder.Object, clientPacketGenerator);
 
-			ServerNetwork serverNetwork = new ServerNetwork(mockServerSocketBuilder.Object, mockServerNetworkListener.Object);
+			clientNetwork.Connect(host, port);
 
-			serverNetwork.Listen(0);
 			for (int i = 0; i < 100; i++)
 			{
-				serverNetwork.Handle();
+				clientNetwork.Handle();
 			}
 
-			mockServerSocket.Verify(m => m.listen(0));
+			clientNetwork.Send(toSend);
 
-			mockServerNetworkListener.Verify(m => m.OnConnected(It.IsAny<int>()));
-			mockServerNetworkListener.Verify(m => m.OnLogin(It.IsAny<int>(), "A", "B"));
+
+
+			mockClientSocket.Verify(x => x.connect(host, port));
+			mockDataSocket.Verify(m => m.send(toSend));
 		}
 
 		[TestMethod]
-		public void TestLoginFailure()
+		public void TestServerNetwork()
 		{
+			byte[] toSend = new byte[10];
+			int port = 1000;
+
 			Mock<DataSocket> mockDataSocket = new Mock<DataSocket>();
 
-			mockDataSocket.Setup(m => m.handle());
-			mockDataSocket.SetupSequence(m => m.getMessage()).Returns(
-				PacketBuilder.New().Add<Int32>(PacketIds.PACKET_ID_CLIENT_LOGIN).Add("A").Add("B").Build()
-				).Returns((byte[])null);
+			mockDataSocket.Setup(x => x.getMessage()).Returns<byte[]>(null);
 
-			Mock<ServerSocket> mockServerSocket = new Mock<ServerSocket>();
-			mockServerSocket.Setup(m => m.listen(0));
-			mockServerSocket.Setup(m => m.handle()).Returns(mockDataSocket.Object);
+			Mock<ServerSocket> mockSocket = new Mock<ServerSocket>();
+			
+			mockSocket.SetupSequence(x => x.handle()).Returns((DataSocket)null).Returns(mockDataSocket.Object).Returns((DataSocket)null);
 
-
-			Mock<ServerNetworkListener> mockServerNetworkListener = new Mock<ServerNetworkListener>();
-			mockServerNetworkListener.Setup(m => m.OnConnected(It.IsAny<int>()));
-			mockServerNetworkListener.Setup(m => m.OnLogin(It.IsAny<int>(), "A", "B")).Returns(ServerNetworkLoginResponse.INCORRECT_USER);
+			Mock<IBuilder<ServerSocket>> mockSocketBuilder = new Mock<IBuilder<ServerSocket>>();
+			mockSocketBuilder.Setup(x => x.Build()).Returns(mockSocket.Object);
 
 
-			Mock<ServerSocketBuilder> mockServerSocketBuilder = new Mock<ServerSocketBuilder>();
-			mockServerSocketBuilder.Setup(m => m.Build()).Returns(mockServerSocket.Object);
+			Mock<NetworkSocketState> mockNetworkSocketState = new Mock<NetworkSocketState>();
+			Mock<IBuilder<NetworkSocketState>> mockNetworkSocketStateBuilder = new Mock<IBuilder<NetworkSocketState>>();
+			mockNetworkSocketStateBuilder.Setup(x => x.Build()).Returns(mockNetworkSocketState.Object);
 
-			ServerNetwork serverNetwork = new ServerNetwork(mockServerSocketBuilder.Object, mockServerNetworkListener.Object);
 
-			serverNetwork.Listen(0);
+			StandardNetworkPacketIdGenerator packetGenerator = new StandardNetworkPacketIdGenerator();
+			ServerNetwork serverNetwork = new ServerNetwork(packetGenerator, mockSocketBuilder.Object, mockNetworkSocketStateBuilder.Object);
+
+			serverNetwork.Listen(port);
+
 			for (int i = 0; i < 100; i++)
 			{
 				serverNetwork.Handle();
 			}
 
-			mockServerSocket.Verify(m => m.listen(0));
+			var first = serverNetwork.GetSockets().First();
 
-			mockServerNetworkListener.Verify(m => m.OnConnected(It.IsAny<int>()));
-			mockServerNetworkListener.Verify(m => m.OnLogin(It.IsAny<int>(), "A", "B"));
-			mockServerNetworkListener.Verify(m => m.OnDisconnected(It.IsAny<int>()));
+			serverNetwork.Send(first.Item1, toSend);
+			serverNetwork.BroadCast(toSend);
+
+			Assert.AreEqual(mockNetworkSocketState.Object, serverNetwork.GetSocketState(first.Item1));
+
+			mockSocket.Verify(x => x.listen(port));
+			mockDataSocket.Verify(m => m.send(toSend), Times.Exactly(2));
 		}
 	}
 }

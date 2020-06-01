@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace LNetwork.service
+namespace LNetwork
 {
-	public interface ServerSocketBuilder
+	public interface IBuilder<T>
 	{
-		ServerSocket Build();
+		T Build();
 	}
 }

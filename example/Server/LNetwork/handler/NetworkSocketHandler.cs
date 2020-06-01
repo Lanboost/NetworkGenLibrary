@@ -1,17 +1,19 @@
 ﻿
 using LNetwork.service;
+using System;
+using System.Collections.Generic;
 
 namespace LNetwork
 {
 
-	public interface NetworkSocketHandler
+	public interface INetworkSocketHandler
 	{
 
 		void Handle();
 
-		SocketNetwork[] GetSockets();
-		uint GetSocketCount();
-		SocketNetwork GetSocket(uint socketId);
+		IEnumerable<Tuple<uint, DataSocket>> GetSockets();
+		int GetSocketCount();
+		DataSocket GetSocket(uint socketId);
 		NetworkSocketState GetSocketState(uint socketId);
 
 		void Send(uint socketId, byte[] msg);

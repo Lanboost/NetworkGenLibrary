@@ -1,5 +1,4 @@
 ﻿using LNetwork.plugins;
-using LNetwork.plugins.lockstep;
 using LNetwork.service;
 using System;
 using System.Collections.Generic;
@@ -8,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace LNetwork.rpc
+namespace LNetwork.lockstep
 {
 	public class LockstepAction
 	{
@@ -24,8 +23,8 @@ namespace LNetwork.rpc
 
 	public interface ILockstepNetworkState
 	{
-		Func<NetworkSocketHandler, T, uint> RegisterLockstep<T>(uint packetId, Func<uint, T, bool> action);
-		void StepLockstep(NetworkSocketHandler handler, uint stepId);
+		Func<T, uint> RegisterLockstep<T>(INetworkSocketHandler handler, uint packetId, Func<uint, T, bool> action);
+		void StepLockstep(INetworkSocketHandler handler, uint stepId);
 		bool IsMaster();
 		bool IsSlave();
 	}
@@ -59,20 +58,33 @@ namespace LNetwork.rpc
 		/*
 		 * Returns a Function that takes X parameters and return the async ID of the request
 		 */
-		public Func<NetworkSocketHandler, T, uint> RegisterLockstep<T>(uint packetId, Func<uint, T, bool> action)
+		public Func<T, uint> RegisterLockstep<T>(INetworkSocketHandler handler, uint packetId, Func<uint, T, bool> action)
 		{
 
 			Actions.Add(packetId, LockstepAction.Create<T>(action));
 
-			return delegate(NetworkSocketHandler handler, T param1)
+			return delegate(T param1)
 			{
-				uint ClientEventId = ClientEventCounter.Get();
-				UnhandledEventIds.Add(ClientEventId);
+				if (!IsMaster())
+				{
+					uint ClientEventId = ClientEventCounter.Get();
+					UnhandledEventIds.Add(ClientEventId);
 
-				byte[] packet = PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)ClientEventId).Add(param1).Build();
+					byte[] packet = PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)ClientEventId).Add(param1).Build();
 
-				handler.Send(packet);
-				return ClientEventId;
+					handler.Send(packet);
+					return ClientEventId;
+				}
+				else
+				{
+					action.Invoke(ClientId, param1);
+
+					byte[] packet = PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)ClientId).Add(param1).Build();
+
+					handler.BroadCast(packet);
+
+					return 0;
+				}
 			};
 		}
 
@@ -81,32 +93,32 @@ namespace LNetwork.rpc
 			this.UnhandledEventIds.Remove(actionId);
 		}
 
-		public void StepLockstep(NetworkSocketHandler handler, uint stepId)
+		public void StepLockstep(INetworkSocketHandler handler, uint stepId)
 		{
 			if (IsMaster())
 			{
 				//First thing we do in handle is to do the actions that are stored
 				//They are only stored on master, as master needs to execute the actions
 				//in the same pipeline order as slaves, aka actions in network handle.
-				
 
-				handler.BroadCast(PacketBuilder.New().Add((UInt32)PacketIdStep).Build());
+				onStepUpdate(stepId);
+				handler.BroadCast(PacketBuilder.New().Add((UInt32)PacketIdStep).Add((UInt32) stepId).Build());
 			}
 		}
 
-		public void Handle(NetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
+		public void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
 		{
 
-			if(packetId == PacketIdHandleAction)
+			if (packetId == PacketIdHandleAction)
 			{
 				//Todo, maybe just maybe this should not crash master...
-				if(AsMaster)
+				if (AsMaster)
 				{
 					throw new Exception("Master should not receive this packet!");
 				}
 				HandleActionId(reader.ReadUInt32());
 			}
-			else if(packetId == PacketIdStep)
+			else if (packetId == PacketIdStep)
 			{
 				if (AsMaster)
 				{
@@ -115,37 +127,39 @@ namespace LNetwork.rpc
 				uint stepId = reader.ReadUInt32();
 				onStepUpdate(stepId);
 			}
-			
-
-			if (AsMaster)
+			else
 			{
-				if (Actions.ContainsKey(packetId))
+
+				if (AsMaster)
 				{
-					uint eventId = reader.ReadUInt32();
-					handler.Send(socketId, PacketBuilder.New().Add((UInt32)PacketIdHandleAction).Add((UInt32)eventId).Build());
-					long position = reader.BaseStream.Position;
-					if (Actions[packetId].Invoke(socketId, reader))
+					if (Actions.ContainsKey(packetId))
 					{
-						reader.BaseStream.Position = position;
-						byte[] data = reader.ReadBytes((int) (reader.BaseStream.Length - reader.BaseStream.Position));
-						handler.BroadCast(PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)socketId).Add(data).Build());
+						uint eventId = reader.ReadUInt32();
+						handler.Send(socketId, PacketBuilder.New().Add((UInt32)PacketIdHandleAction).Add((UInt32)eventId).Build());
+						long position = reader.BaseStream.Position;
+						if (Actions[packetId].Invoke(socketId, reader))
+						{
+							reader.BaseStream.Position = position;
+							byte[] data = reader.ReadBytes((int)(reader.BaseStream.Length - reader.BaseStream.Position));
+							handler.BroadCast(PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)socketId).Add(data).Build());
+						}
+					}
+					else
+					{
+						throw new Exception("Unknown Action Packet Id!");
 					}
 				}
 				else
 				{
-					throw new Exception("Unknown Action Packet Id!");
-				}
-			}
-			else
-			{
-				if (Actions.ContainsKey(packetId))
-				{
-					uint sender = reader.ReadUInt32();
-					Actions[packetId].Invoke(sender, reader);
-				}
-				else
-				{
-					throw new Exception("Unknown Action Packet Id!");
+					if (Actions.ContainsKey(packetId))
+					{
+						uint sender = reader.ReadUInt32();
+						Actions[packetId].Invoke(sender, reader);
+					}
+					else
+					{
+						throw new Exception("Unknown Action Packet Id!");
+					}
 				}
 			}
 		}

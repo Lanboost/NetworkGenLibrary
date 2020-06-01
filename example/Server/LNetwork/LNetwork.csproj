@@ -42,16 +42,17 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="handler\NetworkSocketState.cs" />
+    <Compile Include="IBuilder.cs" />
     <Compile Include="PacketBuilder.cs" />
     <Compile Include="plugins\auth\AuthenticationPackets.cs" />
     <Compile Include="plugins\auth\AuthenticationPlugin.cs" />
     <Compile Include="handler\NetworkSocketHandler.cs" />
     <Compile Include="handler\NetworkPacketIdGenerator.cs" />
     <Compile Include="plugins\lockstep\LockStepNetworkPlugin.cs" />
-    <Compile Include="plugins\lockstep\LockStepState.cs" />
     <Compile Include="handler\rpc\RPC.cs" />
     <Compile Include="service\ClientNetwork.cs" />
-    <Compile Include="service\ClientNetworkListener.cs" />
+    <Compile Include="service\NetworkPackets.cs" />
+    <Compile Include="service\SocketNetworkListener.cs" />
     <Compile Include="ClientSocket.cs" />
     <Compile Include="DataSocket.cs" />
     <Compile Include="normal\NetSocketClientSocket.cs" />
@@ -59,11 +60,8 @@
     <Compile Include="normal\NetSocketServerSocket.cs" />
     <Compile Include="ServerSocket.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="service\PacketIds.cs" />
-    <Compile Include="service\ServerNetworkListener.cs" />
     <Compile Include="service\ServerNetwork.cs" />
     <Compile Include="CurrentMillis.cs" />
-    <Compile Include="service\ServerSocketBuilder.cs" />
     <Compile Include="service\SocketNetwork.cs" />
     <Compile Include="UIDCounter.cs" />
   </ItemGroup>

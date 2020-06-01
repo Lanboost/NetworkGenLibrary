@@ -9,45 +9,99 @@ using System.Threading.Tasks;
 
 namespace LNetwork
 {
-	public class ClientNetwork
+
+	public class PingNetworkState : NetworkSocketState
 	{
-		private static int STATE_CONNECTED = 0;
-		private static int STATE_AUTHENTICATED = 1;
-		private static int STATE_ERROR = 2;
+		IRPCNetworkSocketState rpcState;
+		Func<INetworkSocketHandler, uint, PingPacket, Action<PingResponse>, uint> pingRpc;
 
-		ClientNetworkListener Listener;
+		public PingNetworkState(NetworkPacketIdGenerator gen, uint pollTime = 1000*30, uint timeout = 1000*60)
+		{
+			rpcState = new StandardRPCNetworkSocketState();
+			pingRpc = rpcState.RegisterRPCDual<PingPacket, PingResponse>(gen.Register(), gen.Register(), 
+				delegate(uint socketId, uint packetId, PingPacket pingPacket) {
 
+					
+					return new PingResponse();
+				});
+		}
+
+		public void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
+		{
+			rpcState.Handle(handler, socketId, packetId, reader);
+		}
+
+		public uint[] PacketIdList()
+		{
+			return rpcState.PacketIdList();
+		}
+	}
+
+	public class EnableCloseNetworkState : NetworkSocketState
+	{
+		public void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
+		{
+			throw new NotImplementedException();
+		}
+
+		public uint[] PacketIdList()
+		{
+			throw new NotImplementedException();
+		}
+	}
+
+	public class ClientNetwork: INetworkSocketHandler
+	{
 		ClientSocket ClientSocket;
 		DataSocket socket;
-		int State;
-		string Username;
-		string Password;
 
-		long lastPing;
+		NetworkSocketStateRouter router;
+		IBuilder<ClientSocket> clientSocketBuilder;
 
-		DataSocket CloseSocket;
-		long CloseTimeout;
-
-		public void Connect(string host, int port, string username, string password)
+		public ClientNetwork(IBuilder<ClientSocket> clientSocketBuilder, NetworkPacketIdGenerator gen)
 		{
-			this.Username = username;
-			this.Password = password;
-			ClientSocket = new NetSocketClientSocket();
+			//Wrap socket in a RPC ping handler
+			router = new NetworkSocketStateRouter();
+			var pingState = new PingNetworkState(gen);
+			router.Attach(pingState);
+
+			this.clientSocketBuilder = clientSocketBuilder;
+
+		}
+
+		public void BroadCast(byte[] msg)
+		{
+			throw new NotImplementedException();
+		}
+
+		public void Connect(string host, int port)
+		{
+			ClientSocket = this.clientSocketBuilder.Build();
 			ClientSocket.connect(host, port);
-			
+		}
+
+		public DataSocket GetSocket(uint socketId)
+		{
+			throw new NotImplementedException();
+		}
+
+		public int GetSocketCount()
+		{
+			throw new NotImplementedException();
+		}
+
+		public IEnumerable<Tuple<uint, DataSocket>> GetSockets()
+		{
+			throw new NotImplementedException();
+		}
+
+		public NetworkSocketState GetSocketState(uint socketId)
+		{
+			return router;
 		}
 
 		public void Handle()
 		{
-			if(CloseSocket != null)
-			{
-				CloseSocket.handle();
-				if(CloseTimeout < CurrentMillis.Millis)
-				{
-					CloseSocket = null;
-				}
-			}
-
 			if (socket != null)
 			{
 				socket.handle();
@@ -58,48 +112,13 @@ namespace LNetwork
 					if(msg != null)
 					{
 						BinaryReader reader = new BinaryReader(new MemoryStream(msg));
-						int cmd = reader.ReadInt32();
-						if(cmd == PacketIds.PACKET_ID_SERVER_CLOSE)
-						{
-							State = STATE_ERROR;
-							var reason = reader.ReadString();
-							Listener.OnError(reason);
-
-							var mem = new MemoryStream();
-							BinaryWriter writer = new BinaryWriter(mem);
-							writer.Write(PacketIds.PACKET_ID_CLIENT_ACCEPT_CLOSE);
-							writer.Flush();
-							Send(mem.ToArray());
-							CloseTimeout = CurrentMillis.Millis + 10 * 1000;
-							CloseSocket = socket;
-						}
-
-						if (State == STATE_CONNECTED)
-						{
-							if(cmd == PacketIds.PACKET_ID_SERVER_AUTH)
-							{
-								State = STATE_AUTHENTICATED;
-								Listener.OnAuthenticated();
-							}
-						}
-						else if(State == STATE_AUTHENTICATED)
-						{
-							Listener.OnMessage(msg);
-						}
+						uint cmd = reader.ReadUInt32();
+						router.Handle(this, 0, cmd, reader);
 					}
 					else
 					{
 						break;
 					}
-				}
-
-				if(lastPing+20*1000 < CurrentMillis.Millis)
-				{
-					var mem = new MemoryStream();
-					BinaryWriter writer = new BinaryWriter(mem);
-					writer.Write(PacketIds.PACKET_ID_CLIENT_PING);
-					writer.Flush();
-					Send(mem.ToArray());
 				}
 			}
 			else
@@ -107,18 +126,6 @@ namespace LNetwork
 				if (ClientSocket != null)
 				{
 					socket = ClientSocket.handle();
-					State = STATE_CONNECTED;
-					Listener.OnConnected();
-
-					var mem = new MemoryStream();
-					BinaryWriter writer = new BinaryWriter(mem);
-					writer.Write(PacketIds.PACKET_ID_CLIENT_LOGIN);
-					writer.Write(Username);
-					writer.Write(Password);
-					Username = null;
-					Password = null;
-					writer.Flush();
-					Send(mem.ToArray());
 				}
 			}
 		}
@@ -128,5 +135,14 @@ namespace LNetwork
 			socket.send(msg);
 		}
 
+		public void Send(uint socketId, byte[] msg)
+		{
+			Send(msg);
+		}
+
+		public void SetSocketState(uint socketId, NetworkSocketState networkSocketState)
+		{
+			throw new NotImplementedException();
+		}
 	}
 }

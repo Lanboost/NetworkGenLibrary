@@ -8,7 +8,7 @@ namespace LNetwork
 	public interface NetworkSocketState
 	{
 		uint[] PacketIdList();
-		void Handle(NetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader);
+		void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader);
 	}
 
 	public class NetworkSocketStateRouter: NetworkSocketState
@@ -31,7 +31,7 @@ namespace LNetwork
 			}
 		}
 
-		public void Handle(NetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
+		public void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
 		{
 			if(Routes.ContainsKey(packetId))
 			{

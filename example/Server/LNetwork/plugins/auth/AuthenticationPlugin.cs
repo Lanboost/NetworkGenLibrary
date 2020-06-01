@@ -11,7 +11,7 @@ namespace LNetwork.plugins.auth
 	public class AuthenticationClientPlugin : NetworkSocketState
 	{
 		IRPCNetworkSocketState socketNetwork;
-		Func<NetworkSocketHandler, uint, LoginPacket, Action<LoginResponsePacket>, uint> loginRPC;
+		Func<INetworkSocketHandler, uint, LoginPacket, Action<LoginResponsePacket>, uint> loginRPC;
 		Action<LoginResponsePacket> loginCallback;
 
 		public AuthenticationClientPlugin(NetworkPacketIdGenerator generator, IRPCNetworkSocketState socketNetwork, Action<LoginResponsePacket> loginCallback)
@@ -20,7 +20,7 @@ namespace LNetwork.plugins.auth
 			loginRPC = socketNetwork.RegisterRPC<LoginPacket, LoginResponsePacket>(generator.Register());
 		}
 
-		public void Handle(NetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
+		public void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
 		{
 			socketNetwork.Handle(handler, socketId, packetId, reader);
 		}
@@ -30,7 +30,7 @@ namespace LNetwork.plugins.auth
 			return socketNetwork.PacketIdList();
 		}
 
-		public void Login(NetworkSocketHandler handler, string username, string password)
+		public void Login(INetworkSocketHandler handler, string username, string password)
 		{
 			loginRPC.Invoke(handler, uint.MaxValue, new LoginPacket(username, password), loginCallback);
 		}
@@ -46,7 +46,7 @@ namespace LNetwork.plugins.auth
 			socketNetwork.RegisterRPCHandler<LoginPacket, LoginResponsePacket>(generator.Register(), handler);
 		}
 
-		public void Handle(NetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
+		public void Handle(INetworkSocketHandler handler, uint socketId, uint packetId, BinaryReader reader)
 		{
 			socketNetwork.Handle(handler, socketId, packetId, reader);
 		}

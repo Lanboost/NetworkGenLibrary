@@ -22,40 +22,31 @@ namespace LNetwork.service
 		public long Timeout { get; set; }
 	}
 
-	public class ServerNetwork
+	public class ServerNetwork: INetworkSocketHandler
 	{
 
 		private static int STATE_CONNECTED = 0;
-		private static int STATE_AUTHENTICATED = 1;
 		private static int STATE_ERROR = 2;
 
-		Dictionary<int, ConnectionData> ConnectedSockets = new Dictionary<int, ConnectionData>();
-		ServerSocketBuilder ServerSocketBuilder;
+		Dictionary<uint, DataSocket> Sockets = new Dictionary<uint, DataSocket>();
+		Dictionary<uint, NetworkSocketStateRouter> SocketRouteStates = new Dictionary<uint, NetworkSocketStateRouter>();
+		Dictionary<uint, NetworkSocketState> SocketStates = new Dictionary<uint, NetworkSocketState>();
+		IBuilder<ServerSocket> ServerSocketBuilder;
 		ServerSocket ServerSocket;
-		ServerNetworkListener Listener;
+		
 
-		public ServerNetwork(ServerSocketBuilder serverSocketBuilder, ServerNetworkListener listener)
+		UIDCounter SocketIdCounter = new UIDCounter();
+		IBuilder<NetworkSocketState> connectionStateBuilder;
+		NetworkPacketIdGenerator gen;
+		public ServerNetwork(NetworkPacketIdGenerator gen, IBuilder<ServerSocket> serverSocketBuilder,IBuilder<NetworkSocketState> connectionStateBuilder)
 		{
 			ServerSocketBuilder = serverSocketBuilder;
-			Listener = listener;
+
+			this.connectionStateBuilder = connectionStateBuilder;
+			this.gen = gen;
 		}
 
 		int cidCounter = 0;
-
-		public int GetConnectedCount()
-		{
-			return this.ConnectedSockets.Count;
-		}
-
-		private int GetNextCID()
-		{
-			return cidCounter++;
-		}
-
-		private long GetCloseTimeout()
-		{
-			return CurrentMillis.Millis+10*1000;
-		}
 
 		public void Listen(int port)
 		{
@@ -70,153 +61,95 @@ namespace LNetwork.service
 
 		public void Handle()
 		{
-			long currentMillis = CurrentMillis.Millis;
-			long timeoutTimestamp = currentMillis+30*1000;
 
 			var newSocket = ServerSocket.handle();
 			if(newSocket != null)
 			{
-				ConnectionData connectionData = new ConnectionData();
-				connectionData.DataSocket = newSocket;
-				connectionData.State = STATE_CONNECTED;
-				connectionData.Timeout = timeoutTimestamp;
-				var cid = GetNextCID();
-				ConnectedSockets.Add(cid, connectionData);
+				//Wrap socket in a RPC ping handler
+				var router = new NetworkSocketStateRouter();
+				var pingState = new PingNetworkState(gen);
+				router.Attach(pingState);
+				var connectionState = connectionStateBuilder.Build();
 
-				Listener.OnConnected(cid);
+				router.Attach(connectionState);
+				var socketId = SocketIdCounter.Get();
+				SocketRouteStates.Add(socketId, router);
+				SocketStates.Add(socketId, connectionState);
+				Sockets.Add(socketId, newSocket);
 			}
 
 			List<int> timed = new List<int>();
-			foreach (var pair in ConnectedSockets)
+			foreach (var pair in Sockets)
 			{
-				pair.Value.DataSocket.handle();
+				pair.Value.handle();
 				while (true)
 				{
-					var msg = pair.Value.DataSocket.getMessage();
+					var msg = pair.Value.getMessage();
 
 					if (msg != null)
 					{
 						BinaryReader reader = new BinaryReader(new MemoryStream(msg));
-						int cmd = reader.ReadInt32();
+						uint cmd = reader.ReadUInt32();
 
-						if(cmd == PacketIds.PACKET_ID_CLIENT_PING)
-						{
-							if (pair.Value.State != STATE_AUTHENTICATED)
-							{
-								pair.Value.Timeout = timeoutTimestamp;
-							}
-						}
+						SocketStates[pair.Key].Handle(this, pair.Key, cmd, reader);
 
 
-						if (pair.Value.State == STATE_CONNECTED)
-						{
-							if (cmd == PacketIds.PACKET_ID_CLIENT_LOGIN)
-							{
-								var username = reader.ReadString();
-								var password = reader.ReadString();
-								var ret = Listener.OnLogin(pair.Key, username, password);
-
-								if (ret == ServerNetworkLoginResponse.OK)
-								{
-									pair.Value.State = STATE_AUTHENTICATED;
-
-									var mem = new MemoryStream();
-									BinaryWriter writer = new BinaryWriter(mem);
-									writer.Write(PacketIds.PACKET_ID_SERVER_AUTH);
-									writer.Flush();
-									Send(pair.Key, mem.ToArray());
-
-								}
-								else
-								{
-									if (ret == ServerNetworkLoginResponse.INCORRECT_USER)
-									{
-										CloseSocket(pair.Key, "No such user");
-									}
-									else if (ret == ServerNetworkLoginResponse.INCORRECT_PASSWORD)
-									{
-										CloseSocket(pair.Key, "Incorrect password");
-									}
-								}
-							}
-							else
-							{
-								CloseSocket(pair.Key, "Network error");
-							}
-						}
-						else if (pair.Value.State == STATE_AUTHENTICATED)
-						{
-							Listener.OnMessage(pair.Key, msg);
-						}
-						else if (pair.Value.State == STATE_ERROR)
-						{
-							if (cmd == PacketIds.PACKET_ID_CLIENT_ACCEPT_CLOSE)
-							{
-								pair.Value.DataSocket.close();
-								pair.Value.Timeout = 0;
-							}
-						}
 					}
 					else
 					{
 						break;
 					}
 				}
-
-				if(pair.Value.Timeout < currentMillis)
-				{
-					timed.Add(pair.Key);
-				}
 			}
 
-			foreach(var cid in timed)
+		}
+
+		public IEnumerable<Tuple<uint, DataSocket>> GetSockets()
+		{
+			foreach (var elem in Sockets)
 			{
-				if(ConnectedSockets[cid].State == STATE_ERROR)
-				{
-					ConnectedSockets.Remove(cid);
-				}
-				else
-				{
-					CloseSocket(cid, "Socket timed out");
-				}
+				yield return Tuple.Create(elem.Key, elem.Value);
 			}
 		}
 
-		public void CloseSocket(int cid, string reason = null)
+		public int GetSocketCount()
 		{
-			if(reason != null)
-			{
-				Listener.OnError(cid);
-			}
-			Listener.OnDisconnected(cid);
-
-			ConnectedSockets[cid].State = STATE_ERROR;
-			SendClose(cid, reason);
-			ConnectedSockets[cid].Timeout = GetCloseTimeout();
+			return Sockets.Count;
 		}
 
-		private void SendClose(int cid, string reason)
+		public DataSocket GetSocket(uint socketId)
 		{
-			var mem = new MemoryStream();
-			BinaryWriter writer = new BinaryWriter(mem);
-			writer.Write(PacketIds.PACKET_ID_SERVER_CLOSE);
-			writer.Write(reason);
-			writer.Flush();
-			Send(cid, mem.ToArray(), true);
+			return Sockets[socketId];
 		}
 
-		public void Send(int cid, byte[] data, bool ignoreError = false)
+		public NetworkSocketState GetSocketState(uint socketId)
 		{
-			try
+			return SocketStates[socketId];
+		}
+
+		public void Send(uint socketId, byte[] msg)
+		{
+			Sockets[socketId].send(msg);
+		}
+
+		public void Send(byte[] msg)
+		{
+			throw new NotImplementedException();
+		}
+
+		public void BroadCast(byte[] msg)
+		{
+			foreach (var elem in Sockets)
 			{
-				ConnectedSockets[cid].DataSocket.send(data);
+				elem.Value.send(msg);
 			}
-			catch(Exception e) {
-				if(!ignoreError)
-				{
-					CloseSocket(cid, "Network Error");
-				}
-			}
+		}
+
+		public void SetSocketState(uint socketId, NetworkSocketState networkSocketState)
+		{
+			SocketRouteStates[socketId].Detach(SocketStates[socketId]);
+			SocketRouteStates[socketId].Attach(networkSocketState);
+			SocketStates[socketId] = networkSocketState;
 		}
 	}
 }
