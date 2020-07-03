@@ -17,7 +17,7 @@ namespace LNetwork.service
 
 	class ConnectionData
 	{
-		public DataSocket DataSocket { get; set; }
+		public IDataSocket DataSocket { get; set; }
 		public int State { get; set; }
 		public long Timeout { get; set; }
 	}
@@ -25,16 +25,16 @@ namespace LNetwork.service
 	public class ServerNetwork: INetworkSocketHandlerServer
 	{
 
-		Dictionary<uint, DataSocket> Sockets = new Dictionary<uint, DataSocket>();
+		Dictionary<uint, IDataSocket> Sockets = new Dictionary<uint, IDataSocket>();
 		Dictionary<uint, NetworkSocketStateRouter> SocketRoutes = new Dictionary<uint, NetworkSocketStateRouter>();
-		IBuilder<ServerSocket> ServerSocketBuilder;
-		ServerSocket ServerSocket;
+		IBuilder<IServerSocket> ServerSocketBuilder;
+		IServerSocket ServerSocket;
 		
 		UIDCounter SocketIdCounter = new UIDCounter();
 
-		Action<uint, DataSocket, NetworkSocketStateRouter> onConnected;
+		Action<uint, IDataSocket, NetworkSocketStateRouter> onConnected;
 
-		public ServerNetwork(IBuilder<ServerSocket> serverSocketBuilder, Action<uint, DataSocket, NetworkSocketStateRouter> onConnected)
+		public ServerNetwork(IBuilder<IServerSocket> serverSocketBuilder, Action<uint, IDataSocket, NetworkSocketStateRouter> onConnected)
 		{
 			ServerSocketBuilder = serverSocketBuilder;
 			this.onConnected = onConnected;
@@ -93,7 +93,7 @@ namespace LNetwork.service
 
 		}
 
-		public IEnumerable<Tuple<uint, DataSocket>> GetSockets()
+		public IEnumerable<Tuple<uint, IDataSocket>> GetSockets()
 		{
 			foreach (var elem in Sockets)
 			{
@@ -106,7 +106,7 @@ namespace LNetwork.service
 			return Sockets.Count;
 		}
 
-		public DataSocket GetSocket(uint socketId)
+		public IDataSocket GetSocket(uint socketId)
 		{
 			return Sockets[socketId];
 		}
@@ -128,6 +128,10 @@ namespace LNetwork.service
 				elem.Value.send(msg);
 			}
 		}
-		
+
+		public void Close()
+		{
+			this.ServerSocket.Close();
+		}
 	}
 }

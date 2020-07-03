@@ -10,13 +10,14 @@ namespace LNetwork
 	{
 		void Handle();
 		void Send(uint socketId, byte[] msg);
+		void Close();
 	}
 
 	public interface INetworkSocketHandlerServer: INetworkSocketHandler
 	{
-		IEnumerable<Tuple<uint, DataSocket>> GetSockets();
+		IEnumerable<Tuple<uint, IDataSocket>> GetSockets();
 		int GetSocketCount();
-		DataSocket GetSocket(uint socketId);
+		IDataSocket GetSocket(uint socketId);
 		NetworkSocketStateRouter GetSocketRouter(uint socketId);
 
 		void BroadCast(byte[] msg);
@@ -24,7 +25,7 @@ namespace LNetwork
 
 	public interface INetworkSocketHandlerClient: INetworkSocketHandler
 {
-		DataSocket GetSocket();
+		IDataSocket GetSocket();
 		NetworkSocketStateRouter GetSocketRouter();
 		void Send(byte[] msg);
 	}

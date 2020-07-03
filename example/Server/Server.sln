@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestLNetwork", "TestLNetwor
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GeneratedCode", "GeneratedCode\GeneratedCode.csproj", "{40684717-2BD4-463E-8DDA-FEF1E3959DE6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TerasologyWorld", "..\TerasologyWorld\TerasologyWorld.csproj", "{F7067083-F35D-4BE0-9B23-3EED6E2D5575}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -81,6 +83,14 @@ Global
 		{40684717-2BD4-463E-8DDA-FEF1E3959DE6}.Release|Any CPU.Build.0 = Release|Any CPU
 		{40684717-2BD4-463E-8DDA-FEF1E3959DE6}.Release|x64.ActiveCfg = Release|Any CPU
 		{40684717-2BD4-463E-8DDA-FEF1E3959DE6}.Release|x64.Build.0 = Release|Any CPU
+		{F7067083-F35D-4BE0-9B23-3EED6E2D5575}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F7067083-F35D-4BE0-9B23-3EED6E2D5575}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F7067083-F35D-4BE0-9B23-3EED6E2D5575}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F7067083-F35D-4BE0-9B23-3EED6E2D5575}.Debug|x64.Build.0 = Debug|Any CPU
+		{F7067083-F35D-4BE0-9B23-3EED6E2D5575}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F7067083-F35D-4BE0-9B23-3EED6E2D5575}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F7067083-F35D-4BE0-9B23-3EED6E2D5575}.Release|x64.ActiveCfg = Release|Any CPU
+		{F7067083-F35D-4BE0-9B23-3EED6E2D5575}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

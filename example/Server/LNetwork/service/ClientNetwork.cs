@@ -53,13 +53,13 @@ namespace LNetwork
 
 	public class ClientNetwork: INetworkSocketHandler, INetworkSocketHandlerClient
 	{
-		ClientSocket ClientSocket;
-		DataSocket socket;
+		IClientSocket ClientSocket;
+		IDataSocket socket;
 
 		NetworkSocketStateRouter router;
-		IBuilder<ClientSocket> clientSocketBuilder;
+		IBuilder<IClientSocket> clientSocketBuilder;
 
-		public ClientNetwork(IBuilder<ClientSocket> clientSocketBuilder)
+		public ClientNetwork(IBuilder<IClientSocket> clientSocketBuilder)
 		{
 			router = new NetworkSocketStateRouter();
 
@@ -67,13 +67,16 @@ namespace LNetwork
 
 		}
 
+		public Action OnError;
+		public Action OnConnected;
+
 		public void Connect(string host, int port)
 		{
 			ClientSocket = this.clientSocketBuilder.Build();
 			ClientSocket.connect(host, port);
 		}
 
-		public DataSocket GetSocket()
+		public IDataSocket GetSocket()
 		{
 			return socket;
 		}
@@ -108,7 +111,19 @@ namespace LNetwork
 			{
 				if (ClientSocket != null)
 				{
-					socket = ClientSocket.handle();
+					if (ClientSocket.isError())
+					{
+						OnError?.Invoke();
+						ClientSocket = null;
+					}
+					else
+					{
+						socket = ClientSocket.handle();
+						if (socket != null && OnConnected != null)
+						{
+							OnConnected();
+						}
+					}
 				}
 			}
 		}
@@ -121,6 +136,12 @@ namespace LNetwork
 		public void Send(uint socketId, byte[] msg)
 		{
 			socket.send(msg);
+		}
+
+		public void Close()
+		{
+			socket.close();
+			
 		}
 	}
 }

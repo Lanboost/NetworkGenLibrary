@@ -5,10 +5,10 @@ using System.Text;
 
 namespace LNetwork
 {
-    public interface ClientSocket
+    public interface IClientSocket
     {
         void connect(string server, int port);
         bool isError();
-        DataSocket handle();
+        IDataSocket handle();
     }
 }

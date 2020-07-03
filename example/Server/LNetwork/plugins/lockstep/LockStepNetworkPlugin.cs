@@ -35,11 +35,11 @@ namespace LNetwork.lockstep
 	{
 		uint PacketIdHandleAction;
 		uint PacketIdStep;
+		uint PacketSyncPacket;
 		BinaryFormatter binaryFmt = new BinaryFormatter();
 
 		INetworkSocketHandler socketHandler;
-
-		uint ClientId;
+		
 		Action<uint> onStepUpdate;
 
 		List<uint> UnhandledEventIds = new List<uint>();
@@ -47,15 +47,17 @@ namespace LNetwork.lockstep
 		bool AsMaster;
 		
 		Dictionary<uint, Func<uint, byte[], bool>> Actions = new Dictionary<uint, Func<uint, byte[], bool>>();
-		
+		Action<uint, byte[]> syncHandler;
 
 		UIDCounter ClientEventCounter = new UIDCounter();
 
-		public LockstepNetworkState(uint PacketIdStep, uint PacketIdHandleAction, bool asMaster)
+		public LockstepNetworkState(uint PacketIdStep, uint PacketIdHandleAction, uint PacketSyncPacket, bool asMaster)
 		{
 			this.PacketIdStep = PacketIdStep;
 			this.PacketIdHandleAction = PacketIdHandleAction;
-			
+			this.PacketSyncPacket = PacketSyncPacket;
+
+
 
 			this.AsMaster = asMaster;
 		}
@@ -63,6 +65,18 @@ namespace LNetwork.lockstep
 		public void Bind(INetworkSocketHandler socketHandler)
 		{
 			this.socketHandler = socketHandler;
+			
+		}
+
+		public Action<uint, byte[]> RegisterSync(Action<uint, byte[]> syncHandler)
+		{
+			this.syncHandler = syncHandler;
+			return delegate (uint socketId, byte[] data)
+			{
+				byte[] packet = PacketBuilder.New().Add((UInt32)PacketSyncPacket).Add((UInt32)socketId).Add((UInt32)data.Length).Add(data).Build();
+
+				socketHandler.Send(socketId, packet);
+			};
 		}
 		
 
@@ -93,9 +107,9 @@ namespace LNetwork.lockstep
 				}
 				else
 				{
-					action.Invoke(ClientId, input);
+					action.Invoke(uint.MaxValue, input);
 
-					byte[] packet = PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)ClientId).Add((UInt32)inputdata.Length).Add(inputdata).Build();
+					byte[] packet = PacketBuilder.New().Add((UInt32)packetId).Add((UInt32)uint.MaxValue).Add((UInt32)inputdata.Length).Add(inputdata).Build();
 
 					((INetworkSocketHandlerServer)socketHandler).BroadCast(packet);
 
@@ -150,6 +164,14 @@ namespace LNetwork.lockstep
 				}
 				uint stepId = reader.ReadUInt32();
 				onStepUpdate(stepId);
+			}
+			else if(packetId == PacketSyncPacket)
+			{
+				uint ClientId = reader.ReadUInt32();
+				uint length = reader.ReadUInt32();
+				byte[] data = new byte[length];
+				reader.Read(data, 0, (int)length);
+				syncHandler(ClientId, data);
 			}
 			else
 			{
@@ -208,13 +230,15 @@ namespace LNetwork.lockstep
 
 		public uint[] PacketIdList()
 		{
-			uint[] list = new uint[2 + Actions.Count];
+			uint[] list = new uint[3 + Actions.Count];
 			var index = 0;
 			list[index] = PacketIdHandleAction;
 			index++;
 			list[index] = PacketIdStep;
 			index++;
-			foreach(var key in Actions.Keys)
+			list[index] = PacketSyncPacket;
+			index++;
+			foreach (var key in Actions.Keys)
 			{
 				list[index] = key;
 				index++;

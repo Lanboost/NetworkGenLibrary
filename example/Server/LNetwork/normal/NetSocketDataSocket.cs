@@ -8,7 +8,7 @@ using System.Text;
 
 namespace LNetwork.normal
 {
-	public class NetSocketDataSocket : DataSocket
+	public class NetSocketDataSocket : IDataSocket
     {
 
         static readonly object _object = new object();
@@ -36,7 +36,7 @@ namespace LNetwork.normal
             asyncevent.Completed += readResult;
         }
 
-        public override void close()
+		public void close()
         {
             socket.Close();
         }
@@ -44,17 +44,17 @@ namespace LNetwork.normal
         List<byte[]> messages = new List<byte[]>();
         List<byte[]> readmessages = new List<byte[]>();
 
-        public override bool isConnected()
+		public bool isConnected()
         {
             return state != 0;
         }
 
-        public override bool isError()
+		public bool isError()
         {
             return error;
         }
 
-		public override void send(byte[] message)
+		public void send(byte[] message)
 		{
 			SocketAsyncEventArgs asynceventsend = new SocketAsyncEventArgs();
 			byte[] badbuff = new byte[message.Length + 2];
@@ -72,7 +72,7 @@ namespace LNetwork.normal
 			}
 		}
 
-		public void checkSend(object sender, SocketAsyncEventArgs e)
+		void checkSend(object sender, SocketAsyncEventArgs e)
         {
             if (e.SocketError != SocketError.Success)
             {
@@ -85,7 +85,7 @@ namespace LNetwork.normal
             }
         }
 
-        public void readResult(object sender, SocketAsyncEventArgs e)
+        void readResult(object sender, SocketAsyncEventArgs e)
         {
             lock (_object)
             {
@@ -183,7 +183,7 @@ namespace LNetwork.normal
             }
         }
 
-        public override void handle()
+		public void handle()
         {
             lock (_object)
             {
@@ -206,7 +206,7 @@ namespace LNetwork.normal
             }
         }
 
-        public override byte[] getMessage()
+		public byte[] getMessage()
         {
             lock (_object)
             {
@@ -221,7 +221,7 @@ namespace LNetwork.normal
             return null;
         }
 
-        public override string ip()
+		public string ip()
         {
             try
             {
@@ -236,7 +236,7 @@ namespace LNetwork.normal
             return "";
         }
 
-        public override void setError()
+        public void setError()
         {
             this.error = true;
         }

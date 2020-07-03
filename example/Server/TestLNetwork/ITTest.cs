@@ -20,13 +20,13 @@ namespace TestLNetwork
 		{
 			bool serverOk = false;
 			var serverSocket = new ServerNetwork(
-				new BuilderWrapper<ServerSocket>(
+				new BuilderWrapper<IServerSocket>(
 					delegate ()
 					{
 						return new LNetwork.normal.NetSocketServerSocket();
 					}
 				),
-				delegate (uint socketId, DataSocket socket, NetworkSocketStateRouter router)
+				delegate (uint socketId, IDataSocket socket, NetworkSocketStateRouter router)
 				{
 					serverOk = true;
 				}
@@ -35,7 +35,7 @@ namespace TestLNetwork
 			serverSocket.Listen(8000);
 
 			var client = new ClientNetwork(
-				new BuilderWrapper<ClientSocket>(
+				new BuilderWrapper<IClientSocket>(
 					delegate ()
 					{
 						return new LNetwork.normal.NetSocketClientSocket();
@@ -87,19 +87,19 @@ namespace TestLNetwork
 			);
 
 			lockstepServer = new LockstepNetworkState(
-				0, 1, true
+				0, 1, 2, true
 			);
 
 			var serverStep = lockstepServer.RegisterStepHandler(delegate (uint stepId) { masterStepId = stepId; });
 
 			serverSocket = new ServerNetwork(
-				new BuilderWrapper<ServerSocket>(
+				new BuilderWrapper<IServerSocket>(
 					delegate ()
 					{
 						return new LNetwork.normal.NetSocketServerSocket();
 					}
 				),
-				delegate (uint socketId, DataSocket socket, NetworkSocketStateRouter router)
+				delegate (uint socketId, IDataSocket socket, NetworkSocketStateRouter router)
 				{
 					router.Attach(authServer);
 				}
@@ -112,7 +112,7 @@ namespace TestLNetwork
 			LockstepNetworkState lockstepClient = null;
 
 			lockstepClient = new LockstepNetworkState(
-				0, 1, false
+				0, 1, 2, false
 			);
 
 			lockstepClient.RegisterStepHandler(delegate (uint stepId) { slaveStepId = stepId; });
@@ -132,7 +132,7 @@ namespace TestLNetwork
 			);
 
 			client = new ClientNetwork(
-				new BuilderWrapper<ClientSocket>(
+				new BuilderWrapper<IClientSocket>(
 					delegate ()
 					{
 						return new LNetwork.normal.NetSocketClientSocket();

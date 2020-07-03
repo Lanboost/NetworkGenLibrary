@@ -5,11 +5,11 @@ using System.Text;
 
 namespace LNetwork
 {
-    public interface ServerSocket
+    public interface IServerSocket
     {
         void listen(int port);
 
-        DataSocket handle();
+        IDataSocket handle();
         void Close();
     }
 }

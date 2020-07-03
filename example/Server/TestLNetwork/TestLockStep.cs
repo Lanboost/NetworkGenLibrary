@@ -95,7 +95,7 @@ namespace TestLNetwork
 			Mock<INetworkSocketHandlerServer> mockClientHandler1 = new Mock<INetworkSocketHandlerServer>();
 			Mock<INetworkSocketHandler> mockClientHandler2 = new Mock<INetworkSocketHandler>();
 
-			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, true);
+			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, 10, true);
 			lockstep1.Bind(mockClientHandler1.Object);
 			var masterActionCall = lockstep1.RegisterLockstep<TempSend>(ActionPacketId, delegate(uint socketId, TempSend send)
 			{
@@ -103,7 +103,7 @@ namespace TestLNetwork
 				return true;
 			});
 
-			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, false);
+			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, 10, false);
 			lockstep2.Bind(mockClientHandler2.Object);
 			var slaveActionCall = lockstep2.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
 			{
@@ -162,7 +162,7 @@ namespace TestLNetwork
 			Mock<INetworkSocketHandlerServer> mockClientHandler1 = new Mock<INetworkSocketHandlerServer>();
 			Mock<INetworkSocketHandler> mockClientHandler2 = new Mock<INetworkSocketHandler>();
 
-			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, true);
+			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, 10, true);
 			lockstep1.Bind(mockClientHandler1.Object);
 			var masterActionCall = lockstep1.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
 			{
@@ -170,7 +170,7 @@ namespace TestLNetwork
 				return true;
 			});
 
-			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, false);
+			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, 10, false);
 			lockstep2.Bind(mockClientHandler2.Object);
 			var slaveActionCall = lockstep2.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
 			{
@@ -229,7 +229,7 @@ namespace TestLNetwork
 			Mock<INetworkSocketHandlerServer> mockClientHandler1 = new Mock<INetworkSocketHandlerServer>();
 			Mock<INetworkSocketHandler> mockClientHandler2 = new Mock<INetworkSocketHandler>();
 
-			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, true);
+			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, 2, true);
 			lockstep1.Bind(mockClientHandler1.Object);
 			var masterActionCall = lockstep1.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
 			{
@@ -239,7 +239,7 @@ namespace TestLNetwork
 
 			var masterStep = lockstep1.RegisterStepHandler(delegate (uint stepId) { masterTick = stepId; });
 
-			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, false);
+			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, 2, false);
 			lockstep2.Bind(mockClientHandler2.Object);
 			var slaveActionCall = lockstep2.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
 			{
@@ -303,7 +303,7 @@ namespace TestLNetwork
 			Mock<INetworkSocketHandlerServer> mockClientHandler1 = new Mock<INetworkSocketHandlerServer>();
 			Mock<INetworkSocketHandler> mockClientHandler2 = new Mock<INetworkSocketHandler>();
 
-			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, true);
+			LockstepNetworkState lockstep1 = new LockstepNetworkState(SendPacketId, TickPacketId, 10, true);
 			lockstep1.Bind(mockClientHandler1.Object);
 			var masterActionCall = lockstep1.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
 			{
@@ -313,7 +313,7 @@ namespace TestLNetwork
 
 			var masterStep = lockstep1.RegisterStepHandler(delegate (uint stepId) { masterTick = stepId; });
 
-			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, false);
+			LockstepNetworkState lockstep2 = new LockstepNetworkState(SendPacketId, TickPacketId, 10, false);
 			lockstep2.Bind(mockClientHandler2.Object);
 			var slaveActionCall = lockstep2.RegisterLockstep<TempSend>(ActionPacketId, delegate (uint socketId, TempSend send)
 			{

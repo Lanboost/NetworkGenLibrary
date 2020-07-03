@@ -18,16 +18,16 @@ namespace TestLNetwork
 			string host = "asd";
 			int port = 1000;
 
-			Mock<DataSocket> mockDataSocket = new Mock<DataSocket>();
+			Mock<IDataSocket> mockDataSocket = new Mock<IDataSocket>();
 
 			mockDataSocket.Setup(x => x.getMessage()).Returns<byte[]>(null);
 
-			Mock<ClientSocket> mockClientSocket = new Mock<ClientSocket>();
+			Mock<IClientSocket> mockClientSocket = new Mock<IClientSocket>();
 
 			mockClientSocket.Setup(x => x.connect(It.IsAny<string>(), It.IsAny<Int32>()));
 			mockClientSocket.Setup(x => x.handle()).Returns(mockDataSocket.Object);
 
-			Mock<IBuilder<ClientSocket>> mockClientSocketBuilder = new Mock<IBuilder<ClientSocket>>();
+			Mock<IBuilder<IClientSocket>> mockClientSocketBuilder = new Mock<IBuilder<IClientSocket>>();
 			mockClientSocketBuilder.Setup(x => x.Build()).Returns(mockClientSocket.Object);
 
 			ClientNetwork clientNetwork = new ClientNetwork(mockClientSocketBuilder.Object);
@@ -53,21 +53,21 @@ namespace TestLNetwork
 			byte[] toSend = new byte[10];
 			int port = 1000;
 
-			Mock<DataSocket> mockDataSocket = new Mock<DataSocket>();
+			Mock<IDataSocket> mockDataSocket = new Mock<IDataSocket>();
 
 			mockDataSocket.Setup(x => x.getMessage()).Returns<byte[]>(null);
 
-			Mock<ServerSocket> mockSocket = new Mock<ServerSocket>();
+			Mock<IServerSocket> mockSocket = new Mock<IServerSocket>();
 			
-			mockSocket.SetupSequence(x => x.handle()).Returns((DataSocket)null).Returns(mockDataSocket.Object).Returns((DataSocket)null);
+			mockSocket.SetupSequence(x => x.handle()).Returns((IDataSocket)null).Returns(mockDataSocket.Object).Returns((IDataSocket)null);
 
-			Mock<IBuilder<ServerSocket>> mockSocketBuilder = new Mock<IBuilder<ServerSocket>>();
+			Mock<IBuilder<IServerSocket>> mockSocketBuilder = new Mock<IBuilder<IServerSocket>>();
 			mockSocketBuilder.Setup(x => x.Build()).Returns(mockSocket.Object);
 
 
 			ServerNetwork serverNetwork = new ServerNetwork(
 				mockSocketBuilder.Object, 
-				delegate(uint socketId, DataSocket socket, NetworkSocketStateRouter rotuer)
+				delegate(uint socketId, IDataSocket socket, NetworkSocketStateRouter rotuer)
 			{
 
 			});

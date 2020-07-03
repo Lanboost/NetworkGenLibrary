@@ -7,15 +7,15 @@ using System.Text;
 
 namespace LNetwork.normal
 {
-    public class NetSocketServerSocket : ServerSocket
+    public class NetSocketServerSocket : IServerSocket
     {
         Socket socket;
         SocketAsyncEventArgs asyncevent = new SocketAsyncEventArgs();
         int state = 0;
-        DataSocket dataSocket;
+        IDataSocket dataSocket;
 
 
-        public DataSocket handle()
+        public IDataSocket handle()
         {
             //do async
             if (state == 0)

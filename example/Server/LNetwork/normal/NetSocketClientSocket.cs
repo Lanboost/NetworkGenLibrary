@@ -8,7 +8,7 @@ using System.Text;
 
 namespace LNetwork.normal
 {
-	public class NetSocketClientSocket: ClientSocket
+	public class NetSocketClientSocket: IClientSocket
     {
         Socket socket;
         SocketAsyncEventArgs asyncevent = new SocketAsyncEventArgs();
@@ -71,7 +71,7 @@ namespace LNetwork.normal
             }
         }
 
-        public DataSocket handle()
+        public IDataSocket handle()
         {
             //waiting for connection
             if (state == 0)
